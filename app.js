@@ -999,55 +999,93 @@ class PlatformerGame {
     drawDynamicBackground() {
         const w = this.canvas.width;
         const h = this.canvas.height;
+        const time = this.levelTime * 0.02;
 
         if (this.currentTheme === 'volcano') {
             const caveGrad = this.ctx.createLinearGradient(0, 0, 0, h);
-            caveGrad.addColorStop(0, '#1c1917');
-            caveGrad.addColorStop(0.5, '#292524');
-            caveGrad.addColorStop(1, '#451a03');
+            caveGrad.addColorStop(0, '#0f0d13');
+            caveGrad.addColorStop(0.5, '#1c1921');
+            caveGrad.addColorStop(1, '#3b1206');
             this.ctx.fillStyle = caveGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            const glowGrad = this.ctx.createRadialGradient(w / 2, h, 20, w / 2, h, h * 0.8);
-            glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
+            // Parallax Lava Mountains Background
+            this.ctx.fillStyle = 'rgba(69, 26, 3, 0.45)';
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, h);
+            for (let x = 0; x <= w; x += 20) {
+                const y = h - 120 - Math.sin(x * 0.01) * 40 - Math.cos(x * 0.02) * 20;
+                this.ctx.lineTo(x, y);
+            }
+            this.ctx.lineTo(w, h);
+            this.ctx.fill();
+
+            // Lava Ambient Heat Glow
+            const glowGrad = this.ctx.createRadialGradient(w / 2, h, 20, w / 2, h, h * 0.85);
+            glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.45)');
             glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
             this.ctx.fillStyle = glowGrad;
             this.ctx.fillRect(0, 0, w, h);
 
         } else if (this.currentTheme === 'night') {
             const nightGrad = this.ctx.createLinearGradient(0, 0, 0, h);
-            nightGrad.addColorStop(0, '#090d16');
-            nightGrad.addColorStop(0.6, '#1e1b4b');
-            nightGrad.addColorStop(1, '#312e81');
+            nightGrad.addColorStop(0, '#030712');
+            nightGrad.addColorStop(0.6, '#0f172a');
+            nightGrad.addColorStop(1, '#1e1b4b');
             this.ctx.fillStyle = nightGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            this.ctx.fillStyle = '#e0e7ff';
+            // Glowing Moon with Aura
+            const moonX = w * 0.82;
+            const moonY = 65;
+            const moonGlow = this.ctx.createRadialGradient(moonX, moonY, 15, moonX, moonY, 60);
+            moonGlow.addColorStop(0, 'rgba(224, 231, 255, 0.7)');
+            moonGlow.addColorStop(1, 'rgba(224, 231, 255, 0)');
+            this.ctx.fillStyle = moonGlow;
+            this.ctx.fillRect(moonX - 60, moonY - 60, 120, 120);
+
+            this.ctx.fillStyle = '#f8fafc';
             this.ctx.beginPath();
-            this.ctx.arc(w * 0.82, 55, 20, 0, Math.PI * 2);
+            this.ctx.arc(moonX, moonY, 22, 0, Math.PI * 2);
             this.ctx.fill();
 
-            this.ctx.fillStyle = '#ffffff';
+            // Twinkling Stars
             const stars = [
-                { x: w * 0.1, y: 40 }, { x: w * 0.35, y: 80 }, 
-                { x: w * 0.55, y: 35 }, { x: w * 0.72, y: 110 }
+                { x: w * 0.1, y: 40, s: 2 }, { x: w * 0.35, y: 80, s: 1.5 }, 
+                { x: w * 0.55, y: 35, s: 2.5 }, { x: w * 0.72, y: 110, s: 1.8 },
+                { x: w * 0.22, y: 130, s: 2 }, { x: w * 0.9, y: 45, s: 1.2 }
             ];
-            stars.forEach(s => {
-                this.ctx.fillRect(s.x, s.y, 2, 2);
+            stars.forEach((st, idx) => {
+                const twinkle = Math.sin(time * 3 + idx) * 0.4 + 0.6;
+                this.ctx.fillStyle = `rgba(255, 255, 255, ${twinkle})`;
+                this.ctx.fillRect(st.x, st.y, st.s, st.s);
             });
 
+            // Parallax Distant Night City/Mountains
+            this.ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, h);
+            for (let x = 0; x <= w; x += 15) {
+                const y = h - 100 - Math.sin(x * 0.015 + 1) * 35;
+                this.ctx.lineTo(x, y);
+            }
+            this.ctx.lineTo(w, h);
+            this.ctx.fill();
+
         } else {
+            // Sky Theme
             const skyGrad = this.ctx.createLinearGradient(0, 0, 0, h);
             skyGrad.addColorStop(0, '#0284c7');
             skyGrad.addColorStop(0.5, '#38bdf8');
-            skyGrad.addColorStop(1, '#e0f2fe');
+            skyGrad.addColorStop(1, '#bae6fd');
             this.ctx.fillStyle = skyGrad;
             this.ctx.fillRect(0, 0, w, h);
 
+            // Parallax Animated Clouds
             const clouds = [
-                { x: w * 0.12, y: 70, scale: 0.85 },
-                { x: w * 0.48, y: 115, scale: 1.1 },
-                { x: w * 0.78, y: 140, scale: 0.75 }
+                { x: (w * 0.12 + time * 15) % (w + 100) - 50, y: 70, scale: 0.85 },
+                { x: (w * 0.48 + time * 10) % (w + 120) - 60, y: 115, scale: 1.1 },
+                { x: (w * 0.78 + time * 20) % (w + 80) - 40, y: 140, scale: 0.75 }
             ];
 
             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
@@ -1122,84 +1160,184 @@ class PlatformerGame {
             this.ctx.fill();
         }
 
-        // Render Rising Lava
+        // Render Rising Animated Lava with Sine Wave
         if (this.lava) {
+            this.ctx.save();
+            this.ctx.shadowBlur = 15;
+            this.ctx.shadowColor = '#f97316';
+
             const lavaGrad = this.ctx.createLinearGradient(0, this.lava.y, 0, this.canvas.height);
             lavaGrad.addColorStop(0, '#f97316');
-            lavaGrad.addColorStop(1, '#dc2626');
+            lavaGrad.addColorStop(0.3, '#ea580c');
+            lavaGrad.addColorStop(1, '#991b1b');
             this.ctx.fillStyle = lavaGrad;
-            this.ctx.fillRect(0, this.lava.y, this.canvas.width, this.canvas.height - this.lava.y + 100);
-            
-            this.ctx.fillStyle = '#fef08a';
-            this.ctx.fillRect(0, this.lava.y - 2, this.canvas.width, 3);
-        }
 
-        // Render Goal
-        if (this.goal) {
-            this.ctx.fillStyle = this.goal.isLocked ? '#64748b' : '#10b981';
-            this.ctx.fillRect(this.goal.x, this.goal.y, this.goal.width, this.goal.height);
-            this.ctx.fillStyle = '#fef08a';
-            this.ctx.fillRect(this.goal.x + this.goal.width - 8, this.goal.y + this.goal.height / 2 - 3, 5, 6);
-            if (this.goal.isLocked) {
-                this.ctx.fillStyle = '#ef4444';
-                this.ctx.font = '12px sans-serif';
-                this.ctx.fillText('🔒', this.goal.x + 8, this.goal.y + 24);
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, this.lava.y);
+
+            for (let x = 0; x <= this.canvas.width; x += 8) {
+                const waveY = this.lava.y + Math.sin((x + this.levelTime * 4) * 0.04) * 4;
+                this.ctx.lineTo(x, waveY);
             }
+            this.ctx.lineTo(this.canvas.width, this.canvas.height + 100);
+            this.ctx.lineTo(0, this.canvas.height + 100);
+            this.ctx.closePath();
+            this.ctx.fill();
+
+            this.ctx.strokeStyle = '#fef08a';
+            this.ctx.lineWidth = 2.5;
+            this.ctx.stroke();
+            this.ctx.restore();
         }
 
-        // Render Platforms
+        // Render Goal with Portal Neon Effect
+        if (this.goal) {
+            this.ctx.save();
+            const isLocked = this.goal.isLocked;
+
+            this.ctx.shadowBlur = 15;
+            this.ctx.shadowColor = isLocked ? '#ef4444' : '#10b981';
+
+            this.ctx.fillStyle = isLocked ? '#334155' : '#065f46';
+            this.ctx.strokeStyle = isLocked ? '#ef4444' : '#34d399';
+            this.ctx.lineWidth = 3;
+
+            if (this.ctx.roundRect) {
+                this.ctx.beginPath();
+                this.ctx.roundRect(this.goal.x, this.goal.y, this.goal.width, this.goal.height, [12, 12, 2, 2]);
+                this.ctx.fill();
+                this.ctx.stroke();
+            } else {
+                this.ctx.fillRect(this.goal.x, this.goal.y, this.goal.width, this.goal.height);
+                this.ctx.strokeRect(this.goal.x, this.goal.y, this.goal.width, this.goal.height);
+            }
+
+            if (!isLocked) {
+                const centerX = this.goal.x + this.goal.width / 2;
+                const centerY = this.goal.y + this.goal.height / 2;
+                const portalGrad = this.ctx.createRadialGradient(centerX, centerY, 2, centerX, centerY, 15);
+                portalGrad.addColorStop(0, '#fef08a');
+                portalGrad.addColorStop(0.5, '#10b981');
+                portalGrad.addColorStop(1, '#022c22');
+                this.ctx.fillStyle = portalGrad;
+                this.ctx.fillRect(this.goal.x + 4, this.goal.y + 4, this.goal.width - 8, this.goal.height - 8);
+            } else {
+                this.ctx.fillStyle = '#ef4444';
+                this.ctx.font = 'bold 14px sans-serif';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('🔒', this.goal.x + this.goal.width / 2, this.goal.y + this.goal.height / 2 + 5);
+            }
+
+            this.ctx.restore();
+        }
+
+        // Render Platforms with Rounded Caps & Gradients
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
             if (plat.type === 'phase' && !plat.active) return;
 
-            let bodyColor = '#334155';
-            let topColor = '#22c55e';
+            this.ctx.save();
+            let bodyGrad, topColor;
 
             if (plat.type === 'bounce') {
-                bodyColor = '#a855f7';
+                bodyGrad = '#7e22ce';
                 topColor = '#f472b6';
             } else if (plat.type === 'ice') {
-                bodyColor = '#0284c7';
+                bodyGrad = '#0284c7';
                 topColor = '#bae6fd';
             } else if (plat.type === 'conveyor_left' || plat.type === 'conveyor_right') {
-                bodyColor = '#475569';
+                bodyGrad = '#334155';
                 topColor = '#facc15';
             } else if (plat.type === 'phase') {
-                bodyColor = '#06b6d4';
+                bodyGrad = '#0891b2';
                 topColor = '#67e8f9';
             } else if (this.currentTheme === 'volcano') {
-                bodyColor = plat.type === 'crumble' ? '#451a03' : '#1c1917';
-                topColor = plat.type === 'crumble' ? '#d97706' : '#ea580c';
+                bodyGrad = plat.type === 'crumble' ? '#451a03' : '#1c1917';
+                topColor = plat.type === 'crumble' ? '#f97316' : '#dc2626';
             } else if (this.currentTheme === 'night') {
-                bodyColor = plat.type === 'crumble' ? '#581c87' : '#0f172a';
-                topColor = plat.type === 'crumble' ? '#c084fc' : '#06b6d4';
+                bodyGrad = plat.type === 'crumble' ? '#581c87' : '#0f172a';
+                topColor = plat.type === 'crumble' ? '#c084fc' : '#38bdf8';
+            } else {
+                bodyGrad = plat.type === 'crumble' ? '#78350f' : '#1e293b';
+                topColor = plat.type === 'crumble' ? '#d97706' : '#22c55e';
             }
 
-            this.ctx.fillStyle = bodyColor;
-            this.ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+            if (this.ctx.roundRect) {
+                this.ctx.beginPath();
+                this.ctx.roundRect(plat.x, plat.y, plat.width, plat.height, 4);
+                this.ctx.fillStyle = bodyGrad;
+                this.ctx.fill();
+            } else {
+                this.ctx.fillStyle = bodyGrad;
+                this.ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+            }
+
             this.ctx.fillStyle = topColor;
-            this.ctx.fillRect(plat.x, plat.y, plat.width, 3);
+            if (this.ctx.roundRect) {
+                this.ctx.beginPath();
+                this.ctx.roundRect(plat.x, plat.y, plat.width, 4, [4, 4, 0, 0]);
+                this.ctx.fill();
+            } else {
+                this.ctx.fillRect(plat.x, plat.y, plat.width, 4);
+            }
+
+            if (plat.type === 'conveyor_left' || plat.type === 'conveyor_right') {
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+                const dir = plat.type === 'conveyor_left' ? -1 : 1;
+                const offset = (this.levelTime * 2 * dir) % 12;
+                for (let cx = plat.x + offset; cx < plat.x + plat.width; cx += 12) {
+                    if (cx >= plat.x && cx <= plat.x + plat.width - 4) {
+                        this.ctx.fillRect(cx, plat.y + 6, 4, 4);
+                    }
+                }
+            }
+
+            this.ctx.restore();
         });
 
-        // Render Enemies
+        // Render Enemies with Squishy Animation & Glowing Eyes
         this.enemies.forEach(e => {
             if (e.isDefeated) return;
-            this.ctx.fillStyle = e.isRanged ? '#eab308' : (this.currentTheme === 'volcano' ? '#ef4444' : '#a855f7');
+            this.ctx.save();
+
+            const pulse = Math.sin(this.levelTime * 0.15) * 2;
+            const enemyColor = e.isRanged ? '#eab308' : (this.currentTheme === 'volcano' ? '#ef4444' : '#a855f7');
+
+            this.ctx.shadowBlur = 8;
+            this.ctx.shadowColor = enemyColor;
+
+            this.ctx.fillStyle = enemyColor;
             this.ctx.beginPath();
-            this.ctx.arc(e.x + e.width / 2, e.y + e.height / 2, e.width / 2, Math.PI, 0, false);
-            this.ctx.fillRect(e.x, e.y + e.height / 2, e.width, e.height / 2);
+            this.ctx.arc(e.x + e.width / 2, e.y + e.height / 2 - pulse / 2, e.width / 2, Math.PI, 0, false);
+            this.ctx.fillRect(e.x, e.y + e.height / 2 - pulse / 2, e.width, e.height / 2 + pulse / 2);
             this.ctx.fill();
+
+            const eyeOffset = e.vx > 0 ? 2 : -2;
             this.ctx.fillStyle = '#ffffff';
-            this.ctx.fillRect(e.x + 4, e.y + 6, 4, 4);
-            this.ctx.fillRect(e.x + e.width - 8, e.y + 6, 4, 4);
+            this.ctx.beginPath();
+            this.ctx.arc(e.x + 8 + eyeOffset, e.y + 8 - pulse / 2, 4, 0, Math.PI * 2);
+            this.ctx.arc(e.x + e.width - 8 + eyeOffset, e.y + 8 - pulse / 2, 4, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.fillStyle = '#0f172a';
+            this.ctx.beginPath();
+            this.ctx.arc(e.x + 8 + eyeOffset * 1.5, e.y + 8 - pulse / 2, 2, 0, Math.PI * 2);
+            this.ctx.arc(e.x + e.width - 8 + eyeOffset * 1.5, e.y + 8 - pulse / 2, 2, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.restore();
         });
 
         // Render Projectiles
         this.projectiles.forEach(pj => {
+            this.ctx.save();
+            this.ctx.shadowBlur = 8;
+            this.ctx.shadowColor = pj.color;
             this.ctx.beginPath();
             this.ctx.arc(pj.x, pj.y, pj.radius, 0, Math.PI * 2);
             this.ctx.fillStyle = pj.color;
             this.ctx.fill();
+            this.ctx.restore();
         });
 
         // Render Springs
@@ -1208,21 +1346,53 @@ class PlatformerGame {
             this.ctx.fillRect(sp.x, sp.y, sp.width, sp.height);
         });
 
-        // Render Key Item
+        // Render Floating Vector Key Item
         if (this.keyItem && !this.keyItem.collected) {
-            this.ctx.fillStyle = '#facc15';
-            this.ctx.font = '18px sans-serif';
-            this.ctx.fillText('🔑', this.keyItem.x, this.keyItem.y + 16);
+            this.ctx.save();
+            const keyY = this.keyItem.y + Math.sin(this.levelTime * 0.08) * 4;
+            this.ctx.translate(this.keyItem.x + 10, keyY + 10);
+
+            this.ctx.shadowBlur = 12;
+            this.ctx.shadowColor = '#facc15';
+
+            this.ctx.strokeStyle = '#facc15';
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.arc(-4, -4, 6, 0, Math.PI * 2);
+            this.ctx.stroke();
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            this.ctx.lineTo(10, 10);
+            this.ctx.lineTo(8, 12);
+            this.ctx.moveTo(6, 6);
+            this.ctx.lineTo(4, 8);
+            this.ctx.stroke();
+
+            this.ctx.restore();
         }
 
         // Render Power-up Items
         this.powerups.forEach(pw => {
             if (!pw.collected) {
+                this.ctx.save();
+                const pulseRadius = pw.radius + Math.sin(this.levelTime * 0.1) * 2;
+                const mainColor = pw.type === 'shield' ? '#38bdf8' : (pw.type === 'magnet' ? '#ec4899' : '#f97316');
+
+                this.ctx.shadowBlur = 12;
+                this.ctx.shadowColor = mainColor;
+
                 this.ctx.beginPath();
-                this.ctx.arc(pw.x, pw.y, pw.radius, 0, Math.PI * 2);
-                this.ctx.fillStyle = pw.type === 'shield' ? '#38bdf8' : (pw.type === 'magnet' ? '#ec4899' : '#f97316');
+                this.ctx.arc(pw.x, pw.y, pulseRadius, 0, Math.PI * 2);
+                this.ctx.fillStyle = mainColor;
                 this.ctx.fill();
-                this.ctx.closePath();
+
+                this.ctx.beginPath();
+                this.ctx.arc(pw.x - 3, pw.y - 3, pulseRadius * 0.4, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fill();
+
+                this.ctx.restore();
             }
         });
 
@@ -1241,17 +1411,29 @@ class PlatformerGame {
             }
         });
 
-        // Render Coins
+        // Render Coins with 3D Spin Effect
         this.coins.forEach(coin => {
             if (!coin.collected) {
+                const spinScale = Math.abs(Math.sin(this.levelTime * 0.08));
+                this.ctx.save();
+                this.ctx.translate(coin.x, coin.y);
+                this.ctx.scale(spinScale, 1);
+
+                this.ctx.shadowBlur = 8;
+                this.ctx.shadowColor = '#facc15';
                 this.ctx.beginPath();
-                this.ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+                this.ctx.arc(0, 0, coin.radius, 0, Math.PI * 2);
                 this.ctx.fillStyle = '#facc15';
                 this.ctx.fill();
                 this.ctx.lineWidth = 2;
-                this.ctx.strokeStyle = '#ca8a04';
+                this.ctx.strokeStyle = '#eab308';
                 this.ctx.stroke();
-                this.ctx.closePath();
+
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, coin.radius * 0.5, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#fef08a';
+                this.ctx.fill();
+                this.ctx.restore();
             }
         });
 
