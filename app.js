@@ -160,8 +160,8 @@ class PlatformerGame {
         this.player = {
             x: 30,
             y: h - 100,
-            width: 32,
-            height: 32,
+            width: 48,
+            height: 48,
             vx: 0,
             vy: 0,
             speed: 4.2,
@@ -346,7 +346,7 @@ class PlatformerGame {
             store.addScore(100);
             store.nextLevel();
             this.bannerText = `ปลดล็อกด่าน ${store.getState().level}!`;
-            this.bannerTimer = 90; // แสดงข้อความ 1.5 วินาที
+            this.bannerTimer = 90;
             this.resetEntities();
         }
 
@@ -366,12 +366,58 @@ class PlatformerGame {
         }
     }
 
+    drawSkyBackground() {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        // 1. Vibrant Sky Linear Gradient
+        const skyGrad = this.ctx.createLinearGradient(0, 0, 0, h);
+        skyGrad.addColorStop(0, '#0284c7');   // ฟ้าเข้มด้านบน
+        skyGrad.addColorStop(0.5, '#38bdf8'); // ฟ้าสดใสกลางจอ
+        skyGrad.addColorStop(1, '#e0f2fe');   // ฟ้านวลสว่างบริเวณขอบฟ้า
+        this.ctx.fillStyle = skyGrad;
+        this.ctx.fillRect(0, 0, w, h);
+
+        // 2. Sun & Radiant Glow
+        const sunX = w * 0.82;
+        const sunY = 55;
+        const sunGlow = this.ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 60);
+        sunGlow.addColorStop(0, 'rgba(254, 240, 138, 0.95)');
+        sunGlow.addColorStop(0.4, 'rgba(253, 224, 71, 0.4)');
+        sunGlow.addColorStop(1, 'rgba(253, 224, 71, 0)');
+        this.ctx.fillStyle = sunGlow;
+        this.ctx.beginPath();
+        this.ctx.arc(sunX, sunY, 60, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#fef08a';
+        this.ctx.beginPath();
+        this.ctx.arc(sunX, sunY, 22, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // 3. Fluffy Clouds (ก้อนเมฆนุ่มๆ 3 จุด)
+        const clouds = [
+            { x: w * 0.12, y: 70, scale: 0.85 },
+            { x: w * 0.48, y: 115, scale: 1.1 },
+            { x: w * 0.78, y: 140, scale: 0.75 }
+        ];
+
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+        clouds.forEach(c => {
+            this.ctx.beginPath();
+            this.ctx.arc(c.x, c.y, 18 * c.scale, 0, Math.PI * 2);
+            this.ctx.arc(c.x + 14 * c.scale, c.y - 10 * c.scale, 14 * c.scale, 0, Math.PI * 2);
+            this.ctx.arc(c.x + 28 * c.scale, c.y, 16 * c.scale, 0, Math.PI * 2);
+            this.ctx.arc(c.x + 14 * c.scale, c.y + 6 * c.scale, 14 * c.scale, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+    }
+
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Background Sky
-        this.ctx.fillStyle = '#0284c7';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        // Render Sunny Sky Background
+        this.drawSkyBackground();
 
         // Render Goal (ประตูสีเขียว)
         if (this.goal) {
