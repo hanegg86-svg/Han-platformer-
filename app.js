@@ -333,8 +333,8 @@ class PlatformerGame {
             enemies.push({
                 x: topPlat.x + 5,
                 y: topPlat.y - 28,
-                width: 32, // Hitbox กว้าง 32
-                height: 28, // Hitbox สูง 28
+                width: 32,
+                height: 28,
                 vx: isRanged ? 0 : (1.0 + level * 0.025),
                 minX: topPlat.x,
                 maxX: topPlat.x + topPlat.width - 32,
@@ -450,8 +450,8 @@ class PlatformerGame {
         this.player = {
             x: this.spawnPoint.x,
             y: this.spawnPoint.y,
-            width: 36,  // Hitbox กว้าง 36 (Physical Size คงเดิม)
-            height: 36, // Hitbox สูง 36 (Physical Size คงเดิม)
+            width: 36,  // Hitbox กว้าง 36 (Physical Size คงเดิมเพื่อป้องกันการชนแท่นบน)
+            height: 36, // Hitbox สูง 36 (Physical Size คงเดิมเพื่อป้องกันการชนแท่นบน)
             vx: 0,
             vy: 0,
             speed: 4.8,
@@ -1308,7 +1308,6 @@ class PlatformerGame {
             if (e.isDefeated) return;
             this.ctx.save();
 
-            // 👈 ปรับขยายขนาดแสดงผลของศัตรูให้เด่น/สูงขึ้น (1.35x1.45) โดยยึดตำแหน่งเท้าแตะขอบแท่นพอดี
             const renderW = e.width * 1.35;
             const renderH = e.height * 1.45;
 
@@ -1524,13 +1523,14 @@ class PlatformerGame {
                 this.ctx.rotate(p.rotation);
                 this.ctx.scale(p.scaleX, p.scaleY);
 
-                // 👈 ขยายขนาดภาพวาดตัวละครให้สูงใหญ่ขึ้น (1.55x1.55) โดยยึดตำแหน่งเท้าเดิม
-                const renderW = p.width * 1.55;
-                const renderH = p.height * 1.55;
+                // 👈 เพิ่มขนาดตัวละครเป็น 2.0x ให้สูงใหญ่ชัดเจนสะใจบนหน้าจอ
+                const renderW = p.width * 2.0;
+                const renderH = p.height * 2.0;
 
                 if (p.hasShield) {
                     this.ctx.beginPath();
-                    this.ctx.arc(0, -renderH / 2, renderW / 1.3, 0, Math.PI * 2);
+                    // 👈 กระชับวงกลมโล่ให้อยู่พอดีตัว ไม่ใหญ่เว่อร์เกินไป
+                    this.ctx.arc(0, -renderH / 2, renderH * 0.52, 0, Math.PI * 2);
                     this.ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
                     this.ctx.fill();
                     this.ctx.strokeStyle = '#38bdf8';
