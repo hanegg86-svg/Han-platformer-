@@ -333,8 +333,8 @@ class PlatformerGame {
             enemies.push({
                 x: topPlat.x + 5,
                 y: topPlat.y - 28,
-                width: 32,
-                height: 32,
+                width: 32, // Hitbox กว้าง 32
+                height: 28, // Hitbox สูง 28
                 vx: isRanged ? 0 : (1.0 + level * 0.025),
                 minX: topPlat.x,
                 maxX: topPlat.x + topPlat.width - 32,
@@ -350,7 +350,7 @@ class PlatformerGame {
                 x: midPlat.x + 5,
                 y: midPlat.y - 28,
                 width: 32,
-                height: 32,
+                height: 28,
                 vx: 1.2 + (level * 0.02),
                 minX: midPlat.x,
                 maxX: midPlat.x + midPlat.width - 32,
@@ -450,8 +450,8 @@ class PlatformerGame {
         this.player = {
             x: this.spawnPoint.x,
             y: this.spawnPoint.y,
-            width: 36,  // กล่องการชน (Physics Hitbox) คงเดิมเพื่อไม่ให้ชนชั้นบน
-            height: 36, // กล่องการชน (Physics Hitbox) คงเดิมเพื่อไม่ให้ชนชั้นบน
+            width: 36,  // Hitbox กว้าง 36 (Physical Size คงเดิม)
+            height: 36, // Hitbox สูง 36 (Physical Size คงเดิม)
             vx: 0,
             vy: 0,
             speed: 4.8,
@@ -1308,20 +1308,26 @@ class PlatformerGame {
             if (e.isDefeated) return;
             this.ctx.save();
 
-            const centerX = e.x + e.width / 2;
-            const centerY = e.y + e.height / 2;
-            this.ctx.translate(centerX, centerY);
+            // 👈 ปรับขยายขนาดแสดงผลของศัตรูให้เด่น/สูงขึ้น (1.35x1.45) โดยยึดตำแหน่งเท้าแตะขอบแท่นพอดี
+            const renderW = e.width * 1.35;
+            const renderH = e.height * 1.45;
+
+            const feetX = e.x + e.width / 2;
+            const feetY = e.y + e.height;
+            this.ctx.translate(feetX, feetY);
 
             if (e.vx < 0) {
                 this.ctx.scale(-1, 1);
             }
 
             if (this.enemyImg.complete && this.enemyImg.naturalWidth !== 0) {
-                this.ctx.drawImage(this.enemyImg, -e.width / 2, -e.height / 2, e.width, e.height);
+                this.ctx.drawImage(this.enemyImg, -renderW / 2, -renderH, renderW, renderH);
             } else {
                 // Vector Metal Leafy Draw
-                const w = e.width;
-                const h = e.height;
+                const w = renderW;
+                const h = renderH;
+
+                this.ctx.translate(0, -h / 2);
 
                 // Leaf Body (Metal Gray Gradient)
                 const leafGrad = this.ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
@@ -1518,9 +1524,9 @@ class PlatformerGame {
                 this.ctx.rotate(p.rotation);
                 this.ctx.scale(p.scaleX, p.scaleY);
 
-                // 👈 ขยายขนาดภาพวาดขึ้น 35% โดยยึดตำแหน่งเท้าเดิม (Hitbox 36x36 เท่าเดิม)
-                const renderW = p.width * 1.35;
-                const renderH = p.height * 1.35;
+                // 👈 ขยายขนาดภาพวาดตัวละครให้สูงใหญ่ขึ้น (1.55x1.55) โดยยึดตำแหน่งเท้าเดิม
+                const renderW = p.width * 1.55;
+                const renderH = p.height * 1.55;
 
                 if (p.hasShield) {
                     this.ctx.beginPath();
