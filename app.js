@@ -37,8 +37,8 @@ class SoundFX {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(987.77, this.ctx.currentTime); // B5
-        osc.frequency.setValueAtTime(1318.51, this.ctx.currentTime + 0.08); // E6
+        osc.frequency.setValueAtTime(987.77, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(1318.51, this.ctx.currentTime + 0.08);
         gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.22);
         osc.connect(gain);
@@ -139,11 +139,12 @@ class PlatformerGame {
         // Visual Theme State ('sky', 'volcano', 'night')
         this.currentTheme = 'sky';
 
-        // 3-Star Mission Timers & Banner
+        // Timers, Banners & Game Clear
         this.levelTime = 0;
         this.targetTime = 15;
         this.bannerTimer = 0;
         this.bannerText = '';
+        this.isGameCleared = false;
 
         this.init();
     }
@@ -227,178 +228,193 @@ class PlatformerGame {
         this.canvas.height = container.clientHeight;
     }
 
+    // ระบบเจนเนอเรตด่านแบบไดนามิก 40 ด่านที่มีเอกลักษณ์ไม่ซ้ำกัน
     getLevelData(level, w, h) {
-        const levels = [
-            // ด่าน 1: ทุ่งหญ้า + Checkpoint
-            {
-                theme: 'sky',
-                targetTime: 18,
-                lavaSpeed: 0.10,
-                checkpoint: { x: w * 0.45, y: h - 170, width: 18, height: 30, active: false },
-                platforms: [
-                    { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: w * 0.05, y: h - 80, width: w * 0.32, height: 14, type: 'normal' },
-                    { x: w * 0.42, y: h - 140, width: w * 0.25, height: 14, type: 'bounce' },
-                    { x: w * 0.10, y: h - 250, width: w * 0.32, height: 14, type: 'normal' },
-                    { x: w * 0.52, y: h - 310, width: w * 0.38, height: 14, type: 'normal' }
-                ],
-                coins: [
-                    { x: w * 0.20, y: h - 110, radius: 8, collected: false },
-                    { x: w * 0.54, y: h - 200, radius: 8, collected: false },
-                    { x: w * 0.25, y: h - 280, radius: 8, collected: false }
-                ],
-                spikes: [],
-                springs: [],
-                enemies: [
-                    { x: w * 0.55, y: h - 330, width: 24, height: 20, vx: 1.0, minX: w * 0.52, maxX: w * 0.85, isDefeated: false, isRanged: false }
-                ],
-                powerups: [
-                    { x: w * 0.15, y: h - 280, type: 'magnet', collected: false, radius: 10 }
-                ],
-                keyItem: { x: w * 0.15, y: h - 110, width: 20, height: 20, collected: false },
-                goal: { x: w * 0.75, y: h - 350, width: 30, height: 40, isLocked: true }
-            },
-            // ด่าน 2: ถ้ำหิมะลาวา + ศัตรูยิงกระสุน
-            {
-                theme: 'volcano',
-                targetTime: 16,
-                lavaSpeed: 0.20,
-                checkpoint: { x: w * 0.12, y: h - 250, width: 18, height: 30, active: false },
-                platforms: [
-                    { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: w * 0.05, y: h - 80, width: w * 0.30, height: 14, type: 'ice' },
-                    { x: w * 0.40, y: h - 140, width: w * 0.28, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
-                    { x: w * 0.08, y: h - 220, width: w * 0.34, height: 14, type: 'ice' },
-                    { x: w * 0.50, y: h - 300, width: w * 0.35, height: 14, type: 'normal' }
-                ],
-                coins: [
-                    { x: w * 0.20, y: h - 110, radius: 8, collected: false },
-                    { x: w * 0.52, y: h - 170, radius: 8, collected: false }
-                ],
-                spikes: [
-                    { x: w * 0.38, y: h - 34, width: w * 0.25, height: 14 }
-                ],
-                springs: [],
-                enemies: [
-                    { x: w * 0.55, y: h - 325, width: 24, height: 22, vx: 0, minX: w * 0.5, maxX: w * 0.8, isDefeated: false, isRanged: true, shootTimer: 0 }
-                ],
-                powerups: [
-                    { x: w * 0.12, y: h - 110, type: 'shield', collected: false, radius: 10 }
-                ],
-                keyItem: { x: w * 0.65, y: h - 330, width: 20, height: 20, collected: false },
-                goal: { x: w * 0.10, y: h - 260, width: 30, height: 40, isLocked: true }
-            },
-            // ด่าน 3: ไซเบอร์นีออน
-            {
-                theme: 'night',
-                targetTime: 15,
-                lavaSpeed: 0.28,
-                checkpoint: null,
-                platforms: [
-                    { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: w * 0.05, y: h - 80, width: w * 0.35, height: 14, type: 'conveyor_right' },
-                    { x: w * 0.48, y: h - 150, width: w * 0.35, height: 14, type: 'conveyor_left' },
-                    { x: w * 0.08, y: h - 230, width: w * 0.32, height: 14, type: 'bounce' },
-                    { x: w * 0.50, y: h - 320, width: w * 0.35, height: 14, type: 'normal' }
-                ],
-                coins: [
-                    { x: w * 0.22, y: h - 110, radius: 8, collected: false },
-                    { x: w * 0.62, y: h - 180, radius: 8, collected: false }
-                ],
-                spikes: [
-                    { x: w * 0.35, y: h - 34, width: w * 0.30, height: 14 }
-                ],
-                springs: [],
-                enemies: [
-                    { x: w * 0.55, y: h - 170, width: 24, height: 20, vx: -1.2, minX: w * 0.48, maxX: w * 0.80, isDefeated: false, isRanged: false }
-                ],
-                powerups: [
-                    { x: w * 0.15, y: h - 110, type: 'boost', collected: false, radius: 10 }
-                ],
-                keyItem: { x: w * 0.65, y: h - 180, width: 20, height: 20, collected: false },
-                goal: { x: w * 0.70, y: h - 360, width: 30, height: 40, isLocked: true }
-            },
-            // ด่าน 4: ถ้ำภูเขาไฟ
-            {
-                theme: 'volcano',
-                targetTime: 14,
-                lavaSpeed: 0.32,
-                checkpoint: { x: w * 0.52, y: h - 340, width: 18, height: 30, active: false },
-                platforms: [
-                    { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: w * 0.05, y: h - 80, width: w * 0.28, height: 14, type: 'normal' },
-                    { x: w * 0.40, y: h - 150, width: w * 0.28, height: 14, type: 'phase', timer: 0, active: true },
-                    { x: w * 0.08, y: h - 230, width: w * 0.28, height: 14, type: 'phase', timer: 45, active: false },
-                    { x: w * 0.48, y: h - 310, width: w * 0.38, height: 14, type: 'normal' }
-                ],
-                coins: [
-                    { x: w * 0.52, y: h - 180, radius: 8, collected: false },
-                    { x: w * 0.18, y: h - 260, radius: 8, collected: false }
-                ],
-                spikes: [
-                    { x: w * 0.32, y: h - 34, width: w * 0.32, height: 14 }
-                ],
-                springs: [
-                    { x: w * 0.08, y: h - 90, width: 28, height: 10 }
-                ],
-                enemies: [
-                    { x: w * 0.52, y: h - 330, width: 24, height: 20, vx: 1.5, minX: w * 0.48, maxX: w * 0.82, isDefeated: false, isRanged: false }
-                ],
-                powerups: [
-                    { x: w * 0.60, y: h - 340, type: 'shield', collected: false, radius: 10 }
-                ],
-                keyItem: { x: w * 0.18, y: h - 260, width: 20, height: 20, collected: false },
-                goal: { x: w * 0.72, y: h - 350, width: 30, height: 40, isLocked: true }
-            },
-            // ด่าน 5: ไซเบอร์กอนต์เล็ต
-            {
-                theme: 'night',
-                targetTime: 15,
-                lavaSpeed: 0.38,
-                checkpoint: null,
-                platforms: [
-                    { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: w * 0.03, y: h - 80, width: w * 0.26, height: 14, type: 'conveyor_right' },
-                    { x: w * 0.36, y: h - 140, width: w * 0.24, height: 14, type: 'ice' },
-                    { x: w * 0.68, y: h - 200, width: w * 0.25, height: 14, type: 'bounce' },
-                    { x: w * 0.32, y: h - 270, width: w * 0.26, height: 14, type: 'phase', timer: 0, active: true },
-                    { x: w * 0.03, y: h - 340, width: w * 0.30, height: 14, type: 'normal' }
-                ],
-                coins: [
-                    { x: w * 0.48, y: h - 170, radius: 8, collected: false },
-                    { x: w * 0.44, y: h - 300, radius: 8, collected: false }
-                ],
-                spikes: [
-                    { x: w * 0.28, y: h - 34, width: w * 0.38, height: 14 }
-                ],
-                springs: [],
-                enemies: [
-                    { x: w * 0.06, y: h - 360, width: 24, height: 20, vx: 1.5, minX: w * 0.03, maxX: w * 0.30, isDefeated: false, isRanged: false }
-                ],
-                powerups: [
-                    { x: w * 0.78, y: h - 230, type: 'boost', collected: false, radius: 10 }
-                ],
-                keyItem: { x: w * 0.48, y: h - 170, width: 20, height: 20, collected: false },
-                goal: { x: w * 0.08, y: h - 380, width: 30, height: 40, isLocked: true }
-            }
-        ];
+        if (level > 40) {
+            return null; // จบเกมแล้ว
+        }
 
-        const index = (level - 1) % levels.length;
-        const selected = levels[index];
+        // กำหนดธีมตามช่วงด่าน
+        let theme = 'sky';
+        if (level >= 11 && level <= 25) theme = 'volcano';
+        if (level >= 26) theme = 'night';
+
+        // ปรับความเร็วลาวาและเวลาเป้าหมายตามความยากของด่าน
+        const lavaSpeed = Math.min(0.52, 0.08 + (level - 1) * 0.0115);
+        const targetTime = Math.max(10, 20 - Math.floor((level - 1) / 3));
+
+        // ปูลูกเล่นแท่นตามระดับด่านที่สูงขึ้น
+        const allowedTypes = ['normal'];
+        if (level >= 2) allowedTypes.push('bounce');
+        if (level >= 5) allowedTypes.push('ice');
+        if (level >= 10) allowedTypes.push('crumble');
+        if (level >= 15) allowedTypes.push('conveyor_right', 'conveyor_left');
+        if (level >= 22) allowedTypes.push('phase');
+        if (level >= 28) allowedTypes.push('moving');
+
+        const platformCount = Math.min(9, 5 + Math.floor(level / 7));
+        const verticalGap = Math.min(68, 48 + Math.floor(level * 0.45));
+        const baseWidthRatio = Math.max(0.15, 0.38 - (level * 0.0055));
+
+        const platforms = [{ x: 0, y: h - 20, width: w, height: 20, type: 'normal' }];
+
+        for (let i = 1; i <= platformCount; i++) {
+            const platY = h - 20 - (i * verticalGap);
+            const platWidth = w * baseWidthRatio;
+
+            // สูตรคณิตศาสตร์ล็อกคำนวณตำแหน่ง X เพื่อให้แต่ละด่านมีตำแหน่งแท่นไม่ซ้ำกันแน่นอน
+            const seed = Math.abs(Math.sin(level * 12.9898 + i * 78.233));
+            const platX = seed * (w - platWidth - 30) + 15;
+
+            let pType = 'normal';
+            if (i > 0) {
+                const typeIdx = Math.floor(seed * allowedTypes.length);
+                pType = allowedTypes[typeIdx] || 'normal';
+            }
+
+            const platObj = {
+                x: platX,
+                y: platY,
+                width: platWidth,
+                height: 14,
+                type: pType
+            };
+
+            if (pType === 'phase') {
+                platObj.timer = (i * 25) % 80;
+                platObj.active = (i % 2 === 0);
+            } else if (pType === 'crumble') {
+                platObj.timer = 0;
+                platObj.isCrumbling = false;
+                platObj.isDestroyed = false;
+            } else if (pType === 'moving') {
+                platObj.vx = (i % 2 === 0 ? 1 : -1) * (1.1 + (level * 0.03));
+                platObj.minX = Math.max(10, platX - w * 0.15);
+                platObj.maxX = Math.min(w - platWidth - 10, platX + w * 0.15);
+            }
+
+            platforms.push(platObj);
+        }
+
+        // เหรียญรางวัล
+        const coins = [];
+        for (let i = 1; i < platforms.length; i++) {
+            if (i % 2 === 1 || level < 12) {
+                coins.push({
+                    x: platforms[i].x + platforms[i].width / 2,
+                    y: platforms[i].y - 25,
+                    radius: 8,
+                    collected: false
+                });
+            }
+        }
+
+        // หนามอันตราย
+        const spikes = [];
+        if (level >= 3) {
+            const spikeW = Math.min(w * 0.4, w * 0.12 + (level * 0.006 * w));
+            spikes.push({
+                x: w * 0.32,
+                y: h - 34,
+                width: spikeW,
+                height: 14
+            });
+        }
+
+        // ศัตรู
+        const enemies = [];
+        if (level >= 2) {
+            const topPlat = platforms[platforms.length - 2] || platforms[1];
+            const isRanged = (level >= 12 && level % 3 === 0);
+            enemies.push({
+                x: topPlat.x + 5,
+                y: topPlat.y - 20,
+                width: 24,
+                height: 20,
+                vx: isRanged ? 0 : (1.0 + level * 0.025),
+                minX: topPlat.x,
+                maxX: topPlat.x + topPlat.width - 24,
+                isDefeated: false,
+                isRanged: isRanged,
+                shootTimer: 0
+            });
+        }
+
+        if (level >= 18) {
+            const midPlat = platforms[Math.floor(platforms.length / 2)];
+            enemies.push({
+                x: midPlat.x + 5,
+                y: midPlat.y - 20,
+                width: 24,
+                height: 20,
+                vx: 1.2 + (level * 0.02),
+                minX: midPlat.x,
+                maxX: midPlat.x + midPlat.width - 24,
+                isDefeated: false,
+                isRanged: false
+            });
+        }
+
+        // ไอเทมเสริมพลัง
+        const powerups = [];
+        if (level % 2 === 0 || level > 25) {
+            const pPlat = platforms[1];
+            const pType = level % 3 === 0 ? 'shield' : (level % 3 === 1 ? 'magnet' : 'boost');
+            powerups.push({
+                x: pPlat.x + pPlat.width / 2,
+                y: pPlat.y - 30,
+                type: pType,
+                collected: false,
+                radius: 10
+            });
+        }
+
+        // จุดเซฟ Checkpoint
+        let checkpoint = null;
+        if (level >= 4 && level % 3 === 0) {
+            const midP = platforms[Math.floor(platforms.length / 2)];
+            checkpoint = {
+                x: midP.x + midP.width / 2 - 9,
+                y: midP.y - 30,
+                width: 18,
+                height: 30,
+                active: false
+            };
+        }
+
+        // กุญแจและประตูทางออก
+        const highestPlat = platforms[platforms.length - 1];
+        const keyPlat = platforms[Math.floor(platforms.length / 2)];
+
+        const keyItem = {
+            x: keyPlat.x + keyPlat.width / 2 - 10,
+            y: keyPlat.y - 25,
+            width: 20,
+            height: 20,
+            collected: false
+        };
+
+        const goal = {
+            x: highestPlat.x + highestPlat.width / 2 - 15,
+            y: highestPlat.y - 40,
+            width: 30,
+            height: 40,
+            isLocked: true
+        };
 
         return {
-            theme: selected.theme,
-            targetTime: selected.targetTime,
-            lavaSpeed: selected.lavaSpeed,
-            checkpoint: selected.checkpoint ? { ...selected.checkpoint } : null,
-            platforms: selected.platforms.map(p => ({ ...p })),
-            coins: selected.coins.map(c => ({ ...c })),
-            spikes: selected.spikes.map(s => ({ ...s })),
-            springs: selected.springs.map(sp => ({ ...sp })),
-            enemies: selected.enemies.map(e => ({ ...e })),
-            powerups: selected.powerups.map(pw => ({ ...pw })),
-            keyItem: selected.keyItem ? { ...selected.keyItem } : null,
-            goal: { ...selected.goal }
+            theme,
+            targetTime,
+            lavaSpeed,
+            checkpoint,
+            platforms,
+            coins,
+            spikes,
+            springs: [],
+            enemies,
+            powerups,
+            keyItem,
+            goal
         };
     }
 
@@ -413,6 +429,16 @@ class PlatformerGame {
         this.projectiles = [];
 
         const currentLevel = store.getState().level;
+
+        // ตรวจสอบเงื่อนไขเมื่อผ่านครบ 40 ด่าน
+        if (currentLevel > 40) {
+            this.isGameCleared = true;
+            this.bannerText = '🎉 ยินดีด้วย! คุณพิชิตครบทั้ง 40 ด่านสำเร็จ!';
+            this.bannerTimer = 999999;
+            return;
+        }
+
+        this.isGameCleared = false;
         const levelData = this.getLevelData(currentLevel, w, h);
 
         this.spawnPoint = { x: 25, y: h - 140 };
@@ -533,6 +559,7 @@ class PlatformerGame {
     }
 
     handleJumpTrigger() {
+        if (this.isGameCleared) return;
         const p = this.player;
         if (p.isGrounded) {
             p.vy = p.jumpPower;
@@ -554,6 +581,7 @@ class PlatformerGame {
     }
 
     handleDashTrigger() {
+        if (this.isGameCleared) return;
         const p = this.player;
         if (p.dashCooldown <= 0 && !p.isDashing) {
             p.isDashing = true;
@@ -583,6 +611,7 @@ class PlatformerGame {
     }
 
     handlePlayerDamage() {
+        if (this.isGameCleared) return;
         const p = this.player;
         if (p.invincibleTimer > 0) return;
 
@@ -604,7 +633,7 @@ class PlatformerGame {
 
     update() {
         const state = store.getState();
-        if (state.isGameOver || state.activeTab !== 'game') return;
+        if (state.isGameOver || state.activeTab !== 'game' || this.isGameCleared) return;
 
         const p = this.player;
 
@@ -1045,6 +1074,20 @@ class PlatformerGame {
         }
 
         this.drawDynamicBackground();
+
+        if (this.isGameCleared) {
+            this.ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillStyle = '#facc15';
+            this.ctx.font = 'bold 20px sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('🏆 GAME CLEAR! 🏆', this.canvas.width / 2, this.canvas.height / 2 - 20);
+            this.ctx.font = '14px sans-serif';
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillText('คุณพิชิตครบทั้ง 40 ด่านสำเร็จ!', this.canvas.width / 2, this.canvas.height / 2 + 20);
+            this.ctx.restore();
+            return;
+        }
 
         // Render Particles
         this.particles.forEach(pt => {
