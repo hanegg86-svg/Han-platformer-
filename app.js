@@ -21,12 +21,14 @@ class PlatformerGame {
         // Physics Constants
         this.GRAVITY = 0.45;
         
-        // Game Entities
+        // Game Entities & Banner State
         this.player = null;
         this.platforms = [];
         this.coins = [];
         this.spikes = [];
         this.goal = null;
+        this.bannerTimer = 0;
+        this.bannerText = '';
 
         this.init();
     }
@@ -271,20 +273,17 @@ class PlatformerGame {
         p.x += p.vx;
         p.y += p.vy;
 
-        // Procedural Animation Logic (คำนวณท่าทางขยับ)
+        // Procedural Animation Logic
         if (!p.isGrounded) {
-            // ท่าลอยกลางอากาศ (ยืดตัวสูงขึ้นเล็กน้อย)
             p.scaleX = 0.85;
             p.scaleY = 1.15;
             p.rotation = p.vx * 0.03;
         } else if (p.vx !== 0) {
-            // ท่าเดิน/วิ่ง (เอียงตัวสลับไปมาตามจังหวะ)
             p.walkTimer += 0.25;
             p.rotation = Math.sin(p.walkTimer) * 0.15;
             p.scaleX = 1 + Math.sin(p.walkTimer) * 0.08;
             p.scaleY = 1 - Math.sin(p.walkTimer) * 0.08;
         } else {
-            // ท่านิ่งอยู่กับที่ (ยุบตัวขยายตัวเหมือนกำลังหายใจ)
             p.idleTimer += 0.08;
             p.rotation = 0;
             p.scaleX = 1 + Math.sin(p.idleTimer) * 0.04;
@@ -336,7 +335,7 @@ class PlatformerGame {
             }
         });
 
-        // Goal Collision Detection (Reach Target to Pass Level)
+        // Goal Collision Detection (Pass Level)
         if (
             this.goal &&
             p.x < this.goal.x + this.goal.width &&
@@ -346,6 +345,8 @@ class PlatformerGame {
         ) {
             store.addScore(100);
             store.nextLevel();
+            this.bannerText = `ปลดล็อกด่าน ${store.getState().level}!`;
+            this.bannerTimer = 90; // แสดงข้อความ 1.5 วินาที
             this.resetEntities();
         }
 
@@ -358,6 +359,10 @@ class PlatformerGame {
         if (this.coins.length > 0 && this.coins.every(c => c.collected)) {
             this.coins.forEach(c => c.collected = false);
             store.addScore(50);
+        }
+
+        if (this.bannerTimer > 0) {
+            this.bannerTimer--;
         }
     }
 
@@ -380,7 +385,6 @@ class PlatformerGame {
         this.platforms.forEach(plat => {
             this.ctx.fillStyle = '#334155';
             this.ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-            // Grass Accent Top Line
             this.ctx.fillStyle = '#22c55e';
             this.ctx.fillRect(plat.x, plat.y, plat.width, 3);
         });
@@ -418,22 +422,17 @@ class PlatformerGame {
         const p = this.player;
         if (this.playerImg.complete && this.playerImg.naturalWidth !== 0) {
             this.ctx.save();
-            
-            // ย้ายจุดหมุนไปที่จุดศูนย์กลางของตัวละคร
             const centerX = p.x + p.width / 2;
             const centerY = p.y + p.height / 2;
             this.ctx.translate(centerX, centerY);
 
-            // พลิกตัวละครเมื่อหันซ้าย
             if (p.facing === 'left') {
                 this.ctx.scale(-1, 1);
             }
 
-            // ใส่เอฟเฟกต์หมุนและยืดหดตัวตาม Animation
             this.ctx.rotate(p.rotation);
             this.ctx.scale(p.scaleX, p.scaleY);
 
-            // วาดรูปตัวละคร
             this.ctx.drawImage(
                 this.playerImg,
                 -p.width / 2,
@@ -444,12 +443,22 @@ class PlatformerGame {
 
             this.ctx.restore();
         } else {
-            // Fallback สี่เหลี่ยมเดิมกรณีรูปยังโหลดไม่เสร็จ
             this.ctx.fillStyle = p.color;
             this.ctx.fillRect(p.x, p.y, p.width, p.height);
             this.ctx.fillStyle = '#ffffff';
             const eyeOffset = this.keys.left ? 3 : (this.keys.right ? 13 : 8);
             this.ctx.fillRect(p.x + eyeOffset, p.y + 6, 4, 4);
+        }
+
+        // Render Level Up Banner Text
+        if (this.bannerTimer > 0) {
+            this.ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+            this.ctx.fillRect(0, this.canvas.height / 2 - 30, this.canvas.width, 60);
+            this.ctx.fillStyle = '#facc15';
+            this.ctx.font = 'bold 20px sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(this.bannerText, this.canvas.width / 2, this.canvas.height / 2);
         }
     }
 
