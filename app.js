@@ -135,6 +135,9 @@ class PlatformerGame {
         this.keyItem = null;
         this.goal = null;
 
+        // Camera System
+        this.cameraY = 0; // 👈 ตำแหน่งแกน Y ของมุมกล้อง
+
         // Visual Polish & Juice System
         this.particles = [];
         this.floatingTexts = [];
@@ -318,14 +321,13 @@ class PlatformerGame {
             }
         }
 
-        // 👈 แก้ไขพิกัด Y ของหนามให้อยู่บนพื้นสีเขียวพอดี
         const spikes = [];
         if (level >= 3 && !isBossLevel) {
             const spikeW = Math.min(w * 0.4, w * 0.12 + (level * 0.006 * w));
             const spikeHeight = 14;
             spikes.push({
                 x: w * 0.32,
-                y: h - 20 - spikeHeight, // วางลอยบนพื้นสีเขียวความสูง 20px
+                y: h - 20 - spikeHeight,
                 width: spikeW,
                 height: spikeHeight
             });
@@ -451,6 +453,7 @@ class PlatformerGame {
         const h = this.canvas.height || 400;
 
         this.levelTime = 0;
+        this.cameraY = 0; // 👈 รีเซ็ตกล้องใหม่อยู่ด้านล่างสุด
         this.particles = [];
         this.floatingTexts = [];
         this.projectiles = [];
@@ -693,6 +696,10 @@ class PlatformerGame {
         const p = this.player;
 
         this.levelTime++;
+
+        // 👈 คำนวณขยับกล้องเลื่อนขึ้น-ลงตามตำแหน่งผู้เล่น (Vertical Camera Tracking)
+        const targetCamY = Math.min(0, p.y - this.canvas.height * 0.45);
+        this.cameraY += (targetCamY - this.cameraY) * 0.1; // Smooth Lerp
 
         if (this.lava) {
             const lavaDist = this.lava.y - (p.y + p.height);
@@ -1262,13 +1269,7 @@ class PlatformerGame {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.ctx.save();
-        if (this.shakeTimer > 0) {
-            const rx = (Math.random() - 0.5) * this.shakeIntensity;
-            const ry = (Math.random() - 0.5) * this.shakeIntensity;
-            this.ctx.translate(rx, ry);
-        }
-
+        // 1. Draw Fixed Background (Screen Space)
         this.drawDynamicBackground();
 
         if (this.isGameCleared) {
@@ -1281,9 +1282,20 @@ class PlatformerGame {
             this.ctx.font = '14px sans-serif';
             this.ctx.fillStyle = '#ffffff';
             this.ctx.fillText('คุณพิชิตครบทั้ง 40 ด่านสำเร็จ!', this.canvas.width / 2, this.canvas.height / 2 + 20);
-            this.ctx.restore();
             return;
         }
+
+        // 2. Apply Camera & Screen Shake (World Space Translation)
+        this.ctx.save();
+
+        if (this.shakeTimer > 0) {
+            const rx = (Math.random() - 0.5) * this.shakeIntensity;
+            const ry = (Math.random() - 0.5) * this.shakeIntensity;
+            this.ctx.translate(rx, ry);
+        }
+
+        // 👈 เลื่อนตำแหน่งการวาดวัตถุทั้งหมดตามแกน Y ของกล้อง
+        this.ctx.translate(0, -this.cameraY);
 
         // Render Particles
         this.particles.forEach(pt => {
@@ -1337,8 +1349,8 @@ class PlatformerGame {
                 const waveY = this.lava.y + Math.sin((x + this.levelTime * 4) * 0.04) * 4;
                 this.ctx.lineTo(x, waveY);
             }
-            this.ctx.lineTo(this.canvas.width, this.canvas.height + 100);
-            this.ctx.lineTo(0, this.canvas.height + 100);
+            this.ctx.lineTo(this.canvas.width, this.canvas.height + 800);
+            this.ctx.lineTo(0, this.canvas.height + 800);
             this.ctx.closePath();
             this.ctx.fill();
 
@@ -1677,7 +1689,10 @@ class PlatformerGame {
             this.ctx.globalAlpha = 1.0;
         });
 
-        // Render HUD Info & Combo UI
+        // 👈 คืนค่าการแปลงพิกัด World Space เพื่อกลับมาวาด HUD บนหน้าจอคงที่
+        this.ctx.restore();
+
+        // 3. Render HUD Info & Overlays (Screen Space Fixed)
         const elapsed = Math.floor(this.levelTime / 60);
         this.ctx.font = 'bold 12px sans-serif';
         this.ctx.fillStyle = elapsed > this.targetTime ? '#ef4444' : '#ffffff';
@@ -1711,8 +1726,6 @@ class PlatformerGame {
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(this.bannerText, this.canvas.width / 2, this.canvas.height / 2);
         }
-
-        this.ctx.restore();
     }
 
     gameLoop() {
