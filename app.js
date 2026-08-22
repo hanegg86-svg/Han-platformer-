@@ -318,14 +318,16 @@ class PlatformerGame {
             }
         }
 
+        // 👈 แก้ไขพิกัด Y ของหนามให้อยู่บนพื้นสีเขียวพอดี
         const spikes = [];
         if (level >= 3 && !isBossLevel) {
             const spikeW = Math.min(w * 0.4, w * 0.12 + (level * 0.006 * w));
+            const spikeHeight = 14;
             spikes.push({
                 x: w * 0.32,
-                y: h - 34,
+                y: h - 20 - spikeHeight, // วางลอยบนพื้นสีเขียวความสูง 20px
                 width: spikeW,
-                height: 14
+                height: spikeHeight
             });
         }
 
@@ -1440,7 +1442,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // 👈 Render Spikes (แก้ไขเพิ่มโค้ดวาดหนามสีแดง)
+        // Render Spikes
         this.spikes.forEach(spike => {
             this.ctx.save();
             this.ctx.fillStyle = '#dc2626';
