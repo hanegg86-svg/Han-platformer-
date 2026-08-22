@@ -1,16 +1,110 @@
 import { store } from './store.js';
 import { UIManager } from './ui.js';
 
+// Web Audio API Sound Synthesizer
+class SoundFX {
+    constructor() {
+        this.ctx = null;
+    }
+
+    init() {
+        if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+    }
+
+    playJump() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(450, this.ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+    }
+
+    playCoin() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(987.77, this.ctx.currentTime); // B5
+        osc.frequency.setValueAtTime(1318.51, this.ctx.currentTime + 0.08); // E6
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.22);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.22);
+    }
+
+    playDash() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(90, this.ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.15);
+    }
+
+    playHit() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.25);
+    }
+
+    playCheckpoint() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(659.25, this.ctx.currentTime + 0.08);
+        osc.frequency.setValueAtTime(783.99, this.ctx.currentTime + 0.16);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.3);
+    }
+}
+
 class PlatformerGame {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.ui = new UIManager();
+        this.sfx = new SoundFX();
         
         this.keys = { left: false, right: false, jump: false, dash: false };
         this.animationFrameId = null;
 
-        // Sound Setup
+        // BGM Setup
         this.bgm = new Audio('bgm.mp3');
         this.bgm.loop = true;
 
@@ -29,9 +123,18 @@ class PlatformerGame {
         this.springs = [];
         this.powerups = [];
         this.enemies = [];
+        this.projectiles = [];
+        this.checkpoint = null;
+        this.spawnPoint = { x: 25, y: 0 };
         this.lava = null;
         this.keyItem = null;
         this.goal = null;
+
+        // Visual Polish & Juice System
+        this.particles = [];
+        this.floatingTexts = [];
+        this.shakeTimer = 0;
+        this.shakeIntensity = 0;
 
         // Visual Theme State ('sky', 'volcano', 'night')
         this.currentTheme = 'sky';
@@ -60,6 +163,7 @@ class PlatformerGame {
 
         // Unlock Audio Autoplay on First Interaction
         const unlockAudio = () => {
+            this.sfx.init();
             this.updateBGMState();
             window.removeEventListener('touchstart', unlockAudio);
             window.removeEventListener('mousedown', unlockAudio);
@@ -73,6 +177,37 @@ class PlatformerGame {
 
         this.resetEntities();
         this.gameLoop();
+    }
+
+    triggerShake(intensity = 8, duration = 12) {
+        this.shakeIntensity = intensity;
+        this.shakeTimer = duration;
+    }
+
+    addParticles(x, y, color = '#facc15', count = 12) {
+        for (let i = 0; i < count; i++) {
+            this.particles.push({
+                x,
+                y,
+                vx: (Math.random() - 0.5) * 6,
+                vy: (Math.random() - 0.5) * 6 - 2,
+                size: Math.random() * 4 + 2,
+                color,
+                alpha: 1.0,
+                life: Math.random() * 20 + 20
+            });
+        }
+    }
+
+    addFloatingText(x, y, text, color = '#facc15') {
+        this.floatingTexts.push({
+            x,
+            y,
+            text,
+            color,
+            alpha: 1.0,
+            vy: -1.2
+        });
     }
 
     updateBGMState() {
@@ -94,152 +229,157 @@ class PlatformerGame {
 
     getLevelData(level, w, h) {
         const levels = [
-            // ด่าน 1: ทุ่งหญ้า + แท่นเด้งดึ๋ง Bounce
+            // ด่าน 1: ทุ่งหญ้า + Checkpoint
             {
                 theme: 'sky',
                 targetTime: 18,
                 lavaSpeed: 0.10,
+                checkpoint: { x: w * 0.45, y: h - 170, width: 18, height: 30, active: false },
                 platforms: [
                     { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: 20, y: h - 80, width: 110, height: 14, type: 'normal' },
-                    { x: 150, y: h - 140, width: 80, height: 14, type: 'bounce' },
-                    { x: 40, y: h - 250, width: 110, height: 14, type: 'normal' },
-                    { x: 180, y: h - 310, width: 130, height: 14, type: 'normal' }
+                    { x: w * 0.05, y: h - 80, width: w * 0.32, height: 14, type: 'normal' },
+                    { x: w * 0.42, y: h - 140, width: w * 0.25, height: 14, type: 'bounce' },
+                    { x: w * 0.10, y: h - 250, width: w * 0.32, height: 14, type: 'normal' },
+                    { x: w * 0.52, y: h - 310, width: w * 0.38, height: 14, type: 'normal' }
                 ],
                 coins: [
-                    { x: 70, y: h - 110, radius: 8, collected: false },
-                    { x: 190, y: h - 200, radius: 8, collected: false },
-                    { x: 80, y: h - 280, radius: 8, collected: false }
+                    { x: w * 0.20, y: h - 110, radius: 8, collected: false },
+                    { x: w * 0.54, y: h - 200, radius: 8, collected: false },
+                    { x: w * 0.25, y: h - 280, radius: 8, collected: false }
                 ],
                 spikes: [],
                 springs: [],
                 enemies: [
-                    { x: 180, y: h - 330, width: 24, height: 20, vx: 1.0, minX: 180, maxX: 280, isDefeated: false }
+                    { x: w * 0.55, y: h - 330, width: 24, height: 20, vx: 1.0, minX: w * 0.52, maxX: w * 0.85, isDefeated: false, isRanged: false }
                 ],
                 powerups: [
-                    { x: 50, y: h - 280, type: 'magnet', collected: false, radius: 10 }
+                    { x: w * 0.15, y: h - 280, type: 'magnet', collected: false, radius: 10 }
                 ],
-                keyItem: { x: 50, y: h - 110, width: 20, height: 20, collected: false },
-                goal: { x: 230, y: h - 350, width: 30, height: 40, isLocked: true }
+                keyItem: { x: w * 0.15, y: h - 110, width: 20, height: 20, collected: false },
+                goal: { x: w * 0.75, y: h - 350, width: 30, height: 40, isLocked: true }
             },
-            // ด่าน 2: ถ้ำหิมะลาวา + แท่นน้ำแข็งลื่น Ice Platforms
+            // ด่าน 2: ถ้ำหิมะลาวา + ศัตรูยิงกระสุน
             {
                 theme: 'volcano',
                 targetTime: 16,
                 lavaSpeed: 0.20,
+                checkpoint: { x: w * 0.12, y: h - 250, width: 18, height: 30, active: false },
                 platforms: [
                     { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: 20, y: h - 80, width: 110, height: 14, type: 'ice' },
-                    { x: 150, y: h - 140, width: 100, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
-                    { x: 20, y: h - 220, width: 120, height: 14, type: 'ice' },
-                    { x: 170, y: h - 300, width: 110, height: 14, type: 'normal' }
+                    { x: w * 0.05, y: h - 80, width: w * 0.30, height: 14, type: 'ice' },
+                    { x: w * 0.40, y: h - 140, width: w * 0.28, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
+                    { x: w * 0.08, y: h - 220, width: w * 0.34, height: 14, type: 'ice' },
+                    { x: w * 0.50, y: h - 300, width: w * 0.35, height: 14, type: 'normal' }
                 ],
                 coins: [
-                    { x: 70, y: h - 110, radius: 8, collected: false },
-                    { x: 200, y: h - 170, radius: 8, collected: false }
+                    { x: w * 0.20, y: h - 110, radius: 8, collected: false },
+                    { x: w * 0.52, y: h - 170, radius: 8, collected: false }
                 ],
                 spikes: [
-                    { x: 140, y: h - 34, width: 70, height: 14 }
+                    { x: w * 0.38, y: h - 34, width: w * 0.25, height: 14 }
                 ],
                 springs: [],
                 enemies: [
-                    { x: 30, y: h - 240, width: 24, height: 20, vx: 1.2, minX: 20, maxX: 120, isDefeated: false }
+                    { x: w * 0.55, y: h - 325, width: 24, height: 22, vx: 0, minX: w * 0.5, maxX: w * 0.8, isDefeated: false, isRanged: true, shootTimer: 0 }
                 ],
                 powerups: [
-                    { x: 40, y: h - 110, type: 'shield', collected: false, radius: 10 }
+                    { x: w * 0.12, y: h - 110, type: 'shield', collected: false, radius: 10 }
                 ],
-                keyItem: { x: 200, y: h - 330, width: 20, height: 20, collected: false },
-                goal: { x: 30, y: h - 260, width: 30, height: 40, isLocked: true }
+                keyItem: { x: w * 0.65, y: h - 330, width: 20, height: 20, collected: false },
+                goal: { x: w * 0.10, y: h - 260, width: 30, height: 40, isLocked: true }
             },
-            // ด่าน 3: ไซเบอร์นีออน + แท่นสายพาน Conveyor Belts
+            // ด่าน 3: ไซเบอร์นีออน
             {
                 theme: 'night',
                 targetTime: 15,
                 lavaSpeed: 0.28,
+                checkpoint: null,
                 platforms: [
                     { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: 20, y: h - 80, width: 120, height: 14, type: 'conveyor_right' },
-                    { x: 170, y: h - 150, width: 120, height: 14, type: 'conveyor_left' },
-                    { x: 30, y: h - 230, width: 110, height: 14, type: 'bounce' },
-                    { x: 170, y: h - 320, width: 120, height: 14, type: 'normal' }
+                    { x: w * 0.05, y: h - 80, width: w * 0.35, height: 14, type: 'conveyor_right' },
+                    { x: w * 0.48, y: h - 150, width: w * 0.35, height: 14, type: 'conveyor_left' },
+                    { x: w * 0.08, y: h - 230, width: w * 0.32, height: 14, type: 'bounce' },
+                    { x: w * 0.50, y: h - 320, width: w * 0.35, height: 14, type: 'normal' }
                 ],
                 coins: [
-                    { x: 80, y: h - 110, radius: 8, collected: false },
-                    { x: 220, y: h - 180, radius: 8, collected: false }
+                    { x: w * 0.22, y: h - 110, radius: 8, collected: false },
+                    { x: w * 0.62, y: h - 180, radius: 8, collected: false }
                 ],
                 spikes: [
-                    { x: 120, y: h - 34, width: Math.max(40, w - 160), height: 14 }
+                    { x: w * 0.35, y: h - 34, width: w * 0.30, height: 14 }
                 ],
                 springs: [],
                 enemies: [
-                    { x: 180, y: h - 170, width: 24, height: 20, vx: -1.2, minX: 170, maxX: 270, isDefeated: false }
+                    { x: w * 0.55, y: h - 170, width: 24, height: 20, vx: -1.2, minX: w * 0.48, maxX: w * 0.80, isDefeated: false, isRanged: false }
                 ],
                 powerups: [
-                    { x: 50, y: h - 110, type: 'boost', collected: false, radius: 10 }
+                    { x: w * 0.15, y: h - 110, type: 'boost', collected: false, radius: 10 }
                 ],
-                keyItem: { x: 220, y: h - 180, width: 20, height: 20, collected: false },
-                goal: { x: 210, y: h - 360, width: 30, height: 40, isLocked: true }
+                keyItem: { x: w * 0.65, y: h - 180, width: 20, height: 20, collected: false },
+                goal: { x: w * 0.70, y: h - 360, width: 30, height: 40, isLocked: true }
             },
-            // ด่าน 4: ถ้ำภูเขาไฟ + แท่นสลับจังหวะติด-ดับ Phase Platforms
+            // ด่าน 4: ถ้ำภูเขาไฟ
             {
                 theme: 'volcano',
                 targetTime: 14,
                 lavaSpeed: 0.32,
+                checkpoint: { x: w * 0.52, y: h - 340, width: 18, height: 30, active: false },
                 platforms: [
                     { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: 20, y: h - 80, width: 90, height: 14, type: 'normal' },
-                    { x: 140, y: h - 150, width: 90, height: 14, type: 'phase', timer: 0, active: true },
-                    { x: 20, y: h - 230, width: 90, height: 14, type: 'phase', timer: 45, active: false },
-                    { x: 160, y: h - 310, width: 120, height: 14, type: 'normal' }
+                    { x: w * 0.05, y: h - 80, width: w * 0.28, height: 14, type: 'normal' },
+                    { x: w * 0.40, y: h - 150, width: w * 0.28, height: 14, type: 'phase', timer: 0, active: true },
+                    { x: w * 0.08, y: h - 230, width: w * 0.28, height: 14, type: 'phase', timer: 45, active: false },
+                    { x: w * 0.48, y: h - 310, width: w * 0.38, height: 14, type: 'normal' }
                 ],
                 coins: [
-                    { x: 180, y: h - 180, radius: 8, collected: false },
-                    { x: 60, y: h - 260, radius: 8, collected: false }
+                    { x: w * 0.52, y: h - 180, radius: 8, collected: false },
+                    { x: w * 0.18, y: h - 260, radius: 8, collected: false }
                 ],
                 spikes: [
-                    { x: 110, y: h - 34, width: 100, height: 14 }
+                    { x: w * 0.32, y: h - 34, width: w * 0.32, height: 14 }
                 ],
                 springs: [
-                    { x: 30, y: h - 90, width: 28, height: 10 }
+                    { x: w * 0.08, y: h - 90, width: 28, height: 10 }
                 ],
                 enemies: [
-                    { x: 170, y: h - 330, width: 24, height: 20, vx: 1.5, minX: 160, maxX: 260, isDefeated: false }
+                    { x: w * 0.52, y: h - 330, width: 24, height: 20, vx: 1.5, minX: w * 0.48, maxX: w * 0.82, isDefeated: false, isRanged: false }
                 ],
                 powerups: [
-                    { x: 200, y: h - 340, type: 'shield', collected: false, radius: 10 }
+                    { x: w * 0.60, y: h - 340, type: 'shield', collected: false, radius: 10 }
                 ],
-                keyItem: { x: 60, y: h - 260, width: 20, height: 20, collected: false },
-                goal: { x: 210, y: h - 350, width: 30, height: 40, isLocked: true }
+                keyItem: { x: w * 0.18, y: h - 260, width: 20, height: 20, collected: false },
+                goal: { x: w * 0.72, y: h - 350, width: 30, height: 40, isLocked: true }
             },
-            // ด่าน 5: ไซเบอร์กอนต์เล็ต (ผสมผสานทุกกลไก!)
+            // ด่าน 5: ไซเบอร์กอนต์เล็ต
             {
                 theme: 'night',
                 targetTime: 15,
                 lavaSpeed: 0.38,
+                checkpoint: null,
                 platforms: [
                     { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: 10, y: h - 80, width: 90, height: 14, type: 'conveyor_right' },
-                    { x: 130, y: h - 140, width: 80, height: 14, type: 'ice' },
-                    { x: 230, y: h - 200, width: 80, height: 14, type: 'bounce' },
-                    { x: 110, y: h - 270, width: 80, height: 14, type: 'phase', timer: 0, active: true },
-                    { x: 10, y: h - 340, width: 100, height: 14, type: 'normal' }
+                    { x: w * 0.03, y: h - 80, width: w * 0.26, height: 14, type: 'conveyor_right' },
+                    { x: w * 0.36, y: h - 140, width: w * 0.24, height: 14, type: 'ice' },
+                    { x: w * 0.68, y: h - 200, width: w * 0.25, height: 14, type: 'bounce' },
+                    { x: w * 0.32, y: h - 270, width: w * 0.26, height: 14, type: 'phase', timer: 0, active: true },
+                    { x: w * 0.03, y: h - 340, width: w * 0.30, height: 14, type: 'normal' }
                 ],
                 coins: [
-                    { x: 170, y: h - 170, radius: 8, collected: false },
-                    { x: 150, y: h - 300, radius: 8, collected: false }
+                    { x: w * 0.48, y: h - 170, radius: 8, collected: false },
+                    { x: w * 0.44, y: h - 300, radius: 8, collected: false }
                 ],
                 spikes: [
-                    { x: 100, y: h - 34, width: 120, height: 14 }
+                    { x: w * 0.28, y: h - 34, width: w * 0.38, height: 14 }
                 ],
                 springs: [],
                 enemies: [
-                    { x: 20, y: h - 360, width: 24, height: 20, vx: 1.5, minX: 10, maxX: 90, isDefeated: false }
+                    { x: w * 0.06, y: h - 360, width: 24, height: 20, vx: 1.5, minX: w * 0.03, maxX: w * 0.30, isDefeated: false, isRanged: false }
                 ],
                 powerups: [
-                    { x: 260, y: h - 230, type: 'boost', collected: false, radius: 10 }
+                    { x: w * 0.78, y: h - 230, type: 'boost', collected: false, radius: 10 }
                 ],
-                keyItem: { x: 170, y: h - 170, width: 20, height: 20, collected: false },
-                goal: { x: 30, y: h - 380, width: 30, height: 40, isLocked: true }
+                keyItem: { x: w * 0.48, y: h - 170, width: 20, height: 20, collected: false },
+                goal: { x: w * 0.08, y: h - 380, width: 30, height: 40, isLocked: true }
             }
         ];
 
@@ -250,6 +390,7 @@ class PlatformerGame {
             theme: selected.theme,
             targetTime: selected.targetTime,
             lavaSpeed: selected.lavaSpeed,
+            checkpoint: selected.checkpoint ? { ...selected.checkpoint } : null,
             platforms: selected.platforms.map(p => ({ ...p })),
             coins: selected.coins.map(c => ({ ...c })),
             spikes: selected.spikes.map(s => ({ ...s })),
@@ -267,10 +408,18 @@ class PlatformerGame {
         const h = this.canvas.height || 400;
 
         this.levelTime = 0;
+        this.particles = [];
+        this.floatingTexts = [];
+        this.projectiles = [];
+
+        const currentLevel = store.getState().level;
+        const levelData = this.getLevelData(currentLevel, w, h);
+
+        this.spawnPoint = { x: 25, y: h - 140 };
 
         this.player = {
-            x: 25,
-            y: h - 140,
+            x: this.spawnPoint.x,
+            y: this.spawnPoint.y,
             width: 60,
             height: 60,
             vx: 0,
@@ -289,7 +438,7 @@ class PlatformerGame {
 
             // Active Power-ups State
             hasShield: true,
-            invincibleTimer: 0, // เวลาอมตะชั่วคราวหลังได้รับความเสียหาย
+            invincibleTimer: 0,
             magnetTimer: 0,
             boostTimer: 0,
 
@@ -305,11 +454,9 @@ class PlatformerGame {
             scaleY: 1
         };
 
-        const currentLevel = store.getState().level;
-        const levelData = this.getLevelData(currentLevel, w, h);
-
         this.currentTheme = levelData.theme;
         this.targetTime = levelData.targetTime;
+        this.checkpoint = levelData.checkpoint;
         this.platforms = levelData.platforms;
         this.coins = levelData.coins;
         this.spikes = levelData.spikes;
@@ -319,11 +466,23 @@ class PlatformerGame {
         this.keyItem = levelData.keyItem;
         this.goal = levelData.goal;
 
-        // ลาวาไต่ระดับ
         this.lava = {
             y: h + 120,
             speed: levelData.lavaSpeed
         };
+    }
+
+    respawnAtCheckpoint() {
+        const p = this.player;
+        p.x = this.spawnPoint.x;
+        p.y = this.spawnPoint.y;
+        p.vx = 0;
+        p.vy = -6;
+        p.invincibleTimer = 60;
+        p.hasShield = true;
+        this.triggerShake(10, 15);
+        this.sfx.playHit();
+        this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 20);
     }
 
     setupTouchControls() {
@@ -379,13 +538,18 @@ class PlatformerGame {
             p.vy = p.jumpPower;
             p.isGrounded = false;
             p.jumpsLeft = 1;
+            this.sfx.playJump();
+            this.addParticles(p.x + p.width / 2, p.y + p.height, '#ffffff', 6);
         } else if (p.isWallSliding) {
             p.vy = p.jumpPower;
             p.vx = p.facing === 'left' ? p.speed : -p.speed;
             p.isWallSliding = false;
+            this.sfx.playJump();
         } else if (p.jumpsLeft > 0) {
             p.vy = p.jumpPower * 0.9;
             p.jumpsLeft--;
+            this.sfx.playJump();
+            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 8);
         }
     }
 
@@ -395,6 +559,9 @@ class PlatformerGame {
             p.isDashing = true;
             p.dashTimer = 10;
             p.dashCooldown = 30;
+            this.sfx.playDash();
+            this.triggerShake(5, 8);
+            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#facc15', 14);
         }
     }
 
@@ -415,6 +582,26 @@ class PlatformerGame {
         this.updateBGMState();
     }
 
+    handlePlayerDamage() {
+        const p = this.player;
+        if (p.invincibleTimer > 0) return;
+
+        if (p.hasShield) {
+            p.hasShield = false;
+            p.vy = -8;
+            p.invincibleTimer = 50;
+            this.sfx.playHit();
+            this.triggerShake(8, 12);
+            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 16);
+        } else if (this.checkpoint && this.checkpoint.active) {
+            this.respawnAtCheckpoint();
+        } else if (!store.getState().isGameOver) {
+            this.sfx.playHit();
+            this.triggerShake(14, 20);
+            store.setGameOver(true);
+        }
+    }
+
     update() {
         const state = store.getState();
         if (state.isGameOver || state.activeTab !== 'game') return;
@@ -423,32 +610,54 @@ class PlatformerGame {
 
         this.levelTime++;
 
-        // ตัวนับเวลาอมตะ
         if (p.invincibleTimer > 0) p.invincibleTimer--;
+        if (this.shakeTimer > 0) this.shakeTimer--;
 
-        // อัปเดตลาวาไต่ระดับ
-        if (this.lava) {
-            this.lava.y -= this.lava.speed;
-            if (p.y + p.height > this.lava.y) {
-                if (p.invincibleTimer <= 0) {
-                    if (p.hasShield) {
-                        p.hasShield = false;
-                        p.vy = -12;
-                        p.invincibleTimer = 45;
-                    } else if (!p.isDashing && !state.isGameOver) {
-                        store.setGameOver(true);
-                    }
-                }
+        // Update Particles
+        this.particles.forEach(pt => {
+            pt.x += pt.vx;
+            pt.y += pt.vy;
+            pt.alpha -= 0.03;
+            pt.life--;
+        });
+        this.particles = this.particles.filter(pt => pt.life > 0 && pt.alpha > 0);
+
+        // Update Floating Text
+        this.floatingTexts.forEach(ft => {
+            ft.y += ft.vy;
+            ft.alpha -= 0.02;
+        });
+        this.floatingTexts = this.floatingTexts.filter(ft => ft.alpha > 0);
+
+        // Checkpoint Collision
+        if (this.checkpoint && !this.checkpoint.active) {
+            if (
+                p.x < this.checkpoint.x + this.checkpoint.width &&
+                p.x + p.width > this.checkpoint.x &&
+                p.y < this.checkpoint.y + this.checkpoint.height &&
+                p.y + p.height > this.checkpoint.y
+            ) {
+                this.checkpoint.active = true;
+                this.spawnPoint = { x: this.checkpoint.x, y: this.checkpoint.y - p.height + 10 };
+                this.sfx.playCheckpoint();
+                this.addParticles(this.checkpoint.x, this.checkpoint.y, '#22c55e', 20);
+                this.addFloatingText(this.checkpoint.x - 20, this.checkpoint.y - 15, 'จุดเซฟทำงาน!', '#22c55e');
             }
         }
 
-        // Active Power-up Timers & Boosts
+        // Lava Rise Logic
+        if (this.lava) {
+            this.lava.y -= this.lava.speed;
+            if (p.y + p.height > this.lava.y) {
+                this.handlePlayerDamage();
+            }
+        }
+
         if (p.boostTimer > 0) p.boostTimer--;
         if (p.magnetTimer > 0) p.magnetTimer--;
 
         const currentSpeed = p.boostTimer > 0 ? p.speed * 1.5 : p.speed;
 
-        // Dash Mechanics Logic
         if (p.isDashing) {
             p.vx = p.facing === 'right' ? currentSpeed * 2.8 : -currentSpeed * 2.8;
             p.vy = 0;
@@ -469,7 +678,6 @@ class PlatformerGame {
 
         if (p.dashCooldown > 0) p.dashCooldown--;
 
-        // Position Updates
         p.x += p.vx;
         p.y += p.vy;
 
@@ -485,7 +693,6 @@ class PlatformerGame {
         p.trail.forEach(t => t.alpha -= 0.04);
         p.trail = p.trail.filter(t => t.alpha > 0);
 
-        // Wall Sliding Logic
         p.isWallSliding = false;
         if (!p.isGrounded && p.vy > 0) {
             if (p.x <= 0 && this.keys.left) {
@@ -497,7 +704,6 @@ class PlatformerGame {
             }
         }
 
-        // Screen Boundary Constraints
         if (p.x < 0) p.x = 0;
         if (p.x + p.width > this.canvas.width) p.x = this.canvas.width - p.width;
 
@@ -506,7 +712,6 @@ class PlatformerGame {
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
 
-            // แท่นสลับจังหวะติด-ดับ (Phase Platform)
             if (plat.type === 'phase') {
                 plat.timer = (plat.timer || 0) + 1;
                 plat.active = Math.floor(plat.timer / 80) % 2 === 0;
@@ -520,7 +725,6 @@ class PlatformerGame {
                 }
             }
 
-            // Collision Detection
             if (
                 p.x < plat.x + plat.width &&
                 p.x + p.width > plat.x &&
@@ -528,11 +732,12 @@ class PlatformerGame {
                 p.y + p.height <= plat.y + plat.height + p.vy &&
                 p.vy >= 0
             ) {
-                // แท่นเด้งดึ๋ง (Bounce)
                 if (plat.type === 'bounce') {
                     p.vy = -13.0;
                     p.isGrounded = false;
                     p.jumpsLeft = 1;
+                    this.sfx.playJump();
+                    this.addParticles(p.x + p.width / 2, plat.y, '#f472b6', 10);
                     return;
                 }
 
@@ -542,33 +747,52 @@ class PlatformerGame {
                 p.y = plat.y - p.height;
 
                 if (plat.type === 'moving') p.x += plat.vx;
-                if (plat.type === 'crumble') plat.isCrumbling = true;
+                if (plat.type === 'crumble') {
+                    plat.isCrumbling = true;
+                    this.addParticles(plat.x + plat.width / 2, plat.y, '#d97706', 2);
+                }
 
-                // แท่นน้ำแข็งลื่น (Ice)
                 if (plat.type === 'ice') {
                     if (!this.keys.left && !this.keys.right) {
                         p.vx *= 0.96;
                     }
                 }
 
-                // แท่นสายพาน (Conveyor Belts)
                 if (plat.type === 'conveyor_left') p.x -= 2.2;
                 if (plat.type === 'conveyor_right') p.x += 2.2;
             }
 
             if (plat.isCrumbling) {
                 plat.timer++;
-                if (plat.timer > 50) plat.isDestroyed = true;
+                if (plat.timer > 50) {
+                    plat.isDestroyed = true;
+                    this.addParticles(plat.x + plat.width / 2, plat.y, '#451a03', 15);
+                }
             }
         });
 
-        // Enemies Patrol & Stomp Logic
+        // Enemies & Projectiles
         this.enemies.forEach(enemy => {
             if (enemy.isDefeated) return;
 
-            enemy.x += enemy.vx;
-            if (enemy.x <= enemy.minX || enemy.x + enemy.width >= enemy.maxX) {
-                enemy.vx *= -1;
+            if (!enemy.isRanged) {
+                enemy.x += enemy.vx;
+                if (enemy.x <= enemy.minX || enemy.x + enemy.width >= enemy.maxX) {
+                    enemy.vx *= -1;
+                }
+            } else {
+                enemy.shootTimer = (enemy.shootTimer || 0) + 1;
+                if (enemy.shootTimer >= 100) {
+                    enemy.shootTimer = 0;
+                    this.projectiles.push({
+                        x: enemy.x + enemy.width / 2,
+                        y: enemy.y + enemy.height / 2,
+                        vx: -3.2,
+                        vy: 0,
+                        radius: 5,
+                        color: '#ef4444'
+                    });
+                }
             }
 
             if (
@@ -581,17 +805,29 @@ class PlatformerGame {
                     enemy.isDefeated = true;
                     p.vy = -10.0;
                     store.addScore(50);
-                } else if (p.invincibleTimer <= 0) {
-                    if (p.hasShield) {
-                        p.hasShield = false;
-                        p.vy = -6;
-                        p.invincibleTimer = 45;
-                    } else if (!p.isDashing && !state.isGameOver) {
-                        store.setGameOver(true);
-                    }
+                    this.sfx.playHit();
+                    this.triggerShake(6, 10);
+                    this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 18);
+                    this.addFloatingText(enemy.x, enemy.y, '+50', '#a855f7');
+                } else {
+                    this.handlePlayerDamage();
                 }
             }
         });
+
+        // Projectiles Update
+        this.projectiles.forEach(pj => {
+            pj.x += pj.vx;
+            pj.y += pj.vy;
+
+            const dx = (p.x + p.width / 2) - pj.x;
+            const dy = (p.y + p.height / 2) - pj.y;
+            if (Math.sqrt(dx * dx + dy * dy) < pj.radius + p.width / 2.5) {
+                pj.hit = true;
+                this.handlePlayerDamage();
+            }
+        });
+        this.projectiles = this.projectiles.filter(pj => !pj.hit && pj.x > -20 && pj.x < this.canvas.width + 20);
 
         // Spring Mechanics
         this.springs.forEach(sp => {
@@ -603,6 +839,8 @@ class PlatformerGame {
             ) {
                 p.vy = -14.5;
                 p.jumpsLeft = 1;
+                this.sfx.playJump();
+                this.addParticles(sp.x + sp.width / 2, sp.y, '#ec4899', 10);
             }
         });
 
@@ -617,6 +855,9 @@ class PlatformerGame {
                 this.keyItem.collected = true;
                 if (this.goal) this.goal.isLocked = false;
                 store.addScore(30);
+                this.sfx.playCheckpoint();
+                this.addParticles(this.keyItem.x, this.keyItem.y, '#facc15', 15);
+                this.addFloatingText(this.keyItem.x, this.keyItem.y, 'ปลดล็อกประตู!', '#facc15');
             }
         }
 
@@ -631,6 +872,9 @@ class PlatformerGame {
                     if (pw.type === 'magnet') p.magnetTimer = 300;
                     if (pw.type === 'boost') p.boostTimer = 300;
                     store.addScore(25);
+                    this.sfx.playCheckpoint();
+                    this.addParticles(pw.x, pw.y, '#38bdf8', 12);
+                    this.addFloatingText(pw.x, pw.y, `+25 ${pw.type.toUpperCase()}`, '#38bdf8');
                 }
             }
         });
@@ -642,14 +886,17 @@ class PlatformerGame {
                 const dy = (p.y + p.height / 2) - coin.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
-                if (p.magnetTimer > 0 && dist < 120) {
-                    coin.x += (dx / dist) * -3.5;
-                    coin.y += (dy / dist) * -3.5;
+                if (p.magnetTimer > 0 && dist < 140) {
+                    coin.x += (dx / dist) * -4.0;
+                    coin.y += (dy / dist) * -4.0;
                 }
 
                 if (dist < coin.radius + p.width / 2) {
                     coin.collected = true;
                     store.addScore(10);
+                    this.sfx.playCoin();
+                    this.addParticles(coin.x, coin.y, '#facc15', 8);
+                    this.addFloatingText(coin.x, coin.y, '+10', '#facc15');
                 }
             }
         });
@@ -662,15 +909,7 @@ class PlatformerGame {
                 p.y < spike.y + spike.height &&
                 p.y + p.height > spike.y
             ) {
-                if (p.invincibleTimer <= 0) {
-                    if (p.hasShield) {
-                        p.hasShield = false;
-                        p.vy = -8;
-                        p.invincibleTimer = 45;
-                    } else if (!p.isDashing && !state.isGameOver) {
-                        store.setGameOver(true);
-                    }
-                }
+                this.handlePlayerDamage();
             }
         });
 
@@ -697,23 +936,15 @@ class PlatformerGame {
 
             store.addScore(100);
             store.nextLevel();
+            this.sfx.playCheckpoint();
             this.bannerText = `ผ่านด่าน ${store.getState().level - 1}! ${starsStr}`;
             this.bannerTimer = 110;
             this.resetEntities();
         }
 
-        // Check Fall Off Condition
+        // Fall Off Condition
         if (p.y > this.canvas.height + 40) {
-            if (p.invincibleTimer <= 0) {
-                if (p.hasShield) {
-                    p.hasShield = false;
-                    p.y = this.canvas.height - 120;
-                    p.vy = -10;
-                    p.invincibleTimer = 45;
-                } else if (!state.isGameOver) {
-                    store.setGameOver(true);
-                }
-            }
+            this.handlePlayerDamage();
         }
 
         // Procedural Animation
@@ -805,7 +1036,25 @@ class PlatformerGame {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Screen Shake Translate
+        this.ctx.save();
+        if (this.shakeTimer > 0) {
+            const rx = (Math.random() - 0.5) * this.shakeIntensity;
+            const ry = (Math.random() - 0.5) * this.shakeIntensity;
+            this.ctx.translate(rx, ry);
+        }
+
         this.drawDynamicBackground();
+
+        // Render Particles
+        this.particles.forEach(pt => {
+            this.ctx.beginPath();
+            this.ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+            this.ctx.fillStyle = pt.color;
+            this.ctx.globalAlpha = Math.max(0, pt.alpha);
+            this.ctx.fill();
+            this.ctx.globalAlpha = 1.0;
+        });
 
         // Trail FX
         const p = this.player;
@@ -813,10 +1062,22 @@ class PlatformerGame {
             this.ctx.beginPath();
             this.ctx.arc(t.x, t.y, 12 * t.alpha, 0, Math.PI * 2);
             this.ctx.fillStyle = t.color;
-            this.ctx.globalAlpha = t.alpha;
+            this.ctx.globalAlpha = Math.max(0, t.alpha);
             this.ctx.fill();
             this.ctx.globalAlpha = 1.0;
         });
+
+        // Checkpoint Flag
+        if (this.checkpoint) {
+            this.ctx.fillStyle = this.checkpoint.active ? '#22c55e' : '#38bdf8';
+            this.ctx.fillRect(this.checkpoint.x, this.checkpoint.y, 4, this.checkpoint.height);
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.checkpoint.x + 4, this.checkpoint.y);
+            this.ctx.lineTo(this.checkpoint.x + 20, this.checkpoint.y + 8);
+            this.ctx.lineTo(this.checkpoint.x + 4, this.checkpoint.y + 16);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
 
         // Render Rising Lava
         if (this.lava) {
@@ -880,7 +1141,7 @@ class PlatformerGame {
         // Render Enemies
         this.enemies.forEach(e => {
             if (e.isDefeated) return;
-            this.ctx.fillStyle = this.currentTheme === 'volcano' ? '#ef4444' : '#a855f7';
+            this.ctx.fillStyle = e.isRanged ? '#eab308' : (this.currentTheme === 'volcano' ? '#ef4444' : '#a855f7');
             this.ctx.beginPath();
             this.ctx.arc(e.x + e.width / 2, e.y + e.height / 2, e.width / 2, Math.PI, 0, false);
             this.ctx.fillRect(e.x, e.y + e.height / 2, e.width, e.height / 2);
@@ -888,6 +1149,14 @@ class PlatformerGame {
             this.ctx.fillStyle = '#ffffff';
             this.ctx.fillRect(e.x + 4, e.y + 6, 4, 4);
             this.ctx.fillRect(e.x + e.width - 8, e.y + 6, 4, 4);
+        });
+
+        // Render Projectiles
+        this.projectiles.forEach(pj => {
+            this.ctx.beginPath();
+            this.ctx.arc(pj.x, pj.y, pj.radius, 0, Math.PI * 2);
+            this.ctx.fillStyle = pj.color;
+            this.ctx.fill();
         });
 
         // Render Springs
@@ -943,11 +1212,10 @@ class PlatformerGame {
             }
         });
 
-        // Render Animated Player Image
+        // Render Animated Player
         if (this.playerImg.complete && this.playerImg.naturalWidth !== 0) {
-            // กระพริบตัวละครเมื่ออยู่ในสถานะอมตะ
             if (p.invincibleTimer > 0 && Math.floor(p.invincibleTimer / 4) % 2 === 0) {
-                // เว้นการเรนเดอร์ชั่วขณะเพื่อให้เกิดเอฟเฟกต์กระพริบ
+                // Flash when invincible
             } else {
                 this.ctx.save();
                 const centerX = p.x + p.width / 2;
@@ -961,7 +1229,6 @@ class PlatformerGame {
                 this.ctx.rotate(p.rotation);
                 this.ctx.scale(p.scaleX, p.scaleY);
 
-                // Shield Aura
                 if (p.hasShield) {
                     this.ctx.beginPath();
                     this.ctx.arc(0, 0, p.width / 1.8, 0, Math.PI * 2);
@@ -984,6 +1251,15 @@ class PlatformerGame {
             }
         }
 
+        // Floating Text Render
+        this.floatingTexts.forEach(ft => {
+            this.ctx.font = 'bold 14px sans-serif';
+            this.ctx.fillStyle = ft.color;
+            this.ctx.globalAlpha = Math.max(0, ft.alpha);
+            this.ctx.fillText(ft.text, ft.x, ft.y);
+            this.ctx.globalAlpha = 1.0;
+        });
+
         // Render HUD Info
         const elapsed = Math.floor(this.levelTime / 60);
         this.ctx.font = 'bold 12px sans-serif';
@@ -995,7 +1271,6 @@ class PlatformerGame {
             this.ctx.fillText('🛡️ โล่ทำงาน', 12, 38);
         }
 
-        // Render Level Banner
         if (this.bannerTimer > 0) {
             this.ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
             this.ctx.fillRect(0, this.canvas.height / 2 - 30, this.canvas.width, 60);
@@ -1005,6 +1280,8 @@ class PlatformerGame {
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(this.bannerText, this.canvas.width / 2, this.canvas.height / 2);
         }
+
+        this.ctx.restore();
     }
 
     gameLoop() {
