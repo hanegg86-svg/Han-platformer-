@@ -7,7 +7,9 @@ class Store {
             gamesPlayed: parseInt(localStorage.getItem('platformer_games') || '0', 10),
             soundEnabled: JSON.parse(localStorage.getItem('platformer_sound') ?? 'true'),
             isGameOver: false,
-            level: 1
+            level: 1,
+            selectedSkin: localStorage.getItem('platformer_skin') || 'fire', // 'fire', 'electric', 'gold'
+            coinsCount: parseInt(localStorage.getItem('platformer_coins') || '0', 10)
         };
         this.listeners = [];
     }
@@ -34,10 +36,19 @@ class Store {
 
     addScore(points) {
         this.state.score += points;
+        this.state.coinsCount += Math.floor(points / 5);
+        localStorage.setItem('platformer_coins', this.state.coinsCount.toString());
+
         if (this.state.score > this.state.highScore) {
             this.state.highScore = this.state.score;
             localStorage.setItem('platformer_highscore', this.state.highScore.toString());
         }
+        this.notify();
+    }
+
+    setSkin(skinId) {
+        this.state.selectedSkin = skinId;
+        localStorage.setItem('platformer_skin', skinId);
         this.notify();
     }
 
@@ -71,6 +82,8 @@ class Store {
         localStorage.removeItem('platformer_highscore');
         localStorage.removeItem('platformer_games');
         localStorage.removeItem('platformer_sound');
+        localStorage.removeItem('platformer_skin');
+        localStorage.removeItem('platformer_coins');
         this.state = {
             activeTab: 'game',
             score: 0,
@@ -78,7 +91,9 @@ class Store {
             gamesPlayed: 0,
             soundEnabled: true,
             isGameOver: false,
-            level: 1
+            level: 1,
+            selectedSkin: 'fire',
+            coinsCount: 0
         };
         this.notify();
     }
