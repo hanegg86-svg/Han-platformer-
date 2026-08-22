@@ -14,6 +14,10 @@ class PlatformerGame {
         this.bgm = new Audio('bgm.mp3');
         this.bgm.loop = true;
 
+        // Player Single Image Setup
+        this.playerImg = new Image();
+        this.playerImg.src = 'player.png';
+
         // Physics Constants
         this.GRAVITY = 0.45;
         
@@ -154,14 +158,22 @@ class PlatformerGame {
         this.player = {
             x: 30,
             y: h - 100,
-            width: 24,
+            width: 32,
             height: 32,
             vx: 0,
             vy: 0,
             speed: 4.2,
             jumpPower: -10.5,
             isGrounded: false,
-            color: '#ef4444'
+            color: '#ef4444',
+            
+            // Procedural Animation States
+            facing: 'right',
+            walkTimer: 0,
+            idleTimer: 0,
+            rotation: 0,
+            scaleX: 1,
+            scaleY: 1
         };
 
         const currentLevel = store.getState().level;
@@ -235,10 +247,16 @@ class PlatformerGame {
 
         const p = this.player;
 
-        // Horizontal Movement
-        if (this.keys.left) p.vx = -p.speed;
-        else if (this.keys.right) p.vx = p.speed;
-        else p.vx = 0;
+        // Horizontal Movement & Facing Direction
+        if (this.keys.left) {
+            p.vx = -p.speed;
+            p.facing = 'left';
+        } else if (this.keys.right) {
+            p.vx = p.speed;
+            p.facing = 'right';
+        } else {
+            p.vx = 0;
+        }
 
         // Jump Mechanics
         if (this.keys.jump && p.isGrounded) {
@@ -252,6 +270,26 @@ class PlatformerGame {
         // Position Updates
         p.x += p.vx;
         p.y += p.vy;
+
+        // Procedural Animation Logic (คำนวณท่าทางขยับ)
+        if (!p.isGrounded) {
+            // ท่าลอยกลางอากาศ (ยืดตัวสูงขึ้นเล็กน้อย)
+            p.scaleX = 0.85;
+            p.scaleY = 1.15;
+            p.rotation = p.vx * 0.03;
+        } else if (p.vx !== 0) {
+            // ท่าเดิน/วิ่ง (เอียงตัวสลับไปมาตามจังหวะ)
+            p.walkTimer += 0.25;
+            p.rotation = Math.sin(p.walkTimer) * 0.15;
+            p.scaleX = 1 + Math.sin(p.walkTimer) * 0.08;
+            p.scaleY = 1 - Math.sin(p.walkTimer) * 0.08;
+        } else {
+            // ท่านิ่งอยู่กับที่ (ยุบตัวขยายตัวเหมือนกำลังหายใจ)
+            p.idleTimer += 0.08;
+            p.rotation = 0;
+            p.scaleX = 1 + Math.sin(p.idleTimer) * 0.04;
+            p.scaleY = 1 - Math.sin(p.idleTimer) * 0.04;
+        }
 
         // Screen Boundary Constraints
         if (p.x < 0) p.x = 0;
@@ -376,15 +414,43 @@ class PlatformerGame {
             }
         });
 
-        // Render Player
+        // Render Animated Player Image
         const p = this.player;
-        this.ctx.fillStyle = p.color;
-        this.ctx.fillRect(p.x, p.y, p.width, p.height);
+        if (this.playerImg.complete && this.playerImg.naturalWidth !== 0) {
+            this.ctx.save();
+            
+            // ย้ายจุดหมุนไปที่จุดศูนย์กลางของตัวละคร
+            const centerX = p.x + p.width / 2;
+            const centerY = p.y + p.height / 2;
+            this.ctx.translate(centerX, centerY);
 
-        // Player Eyes Facing Direction
-        this.ctx.fillStyle = '#ffffff';
-        const eyeOffset = this.keys.left ? 3 : (this.keys.right ? 13 : 8);
-        this.ctx.fillRect(p.x + eyeOffset, p.y + 6, 4, 4);
+            // พลิกตัวละครเมื่อหันซ้าย
+            if (p.facing === 'left') {
+                this.ctx.scale(-1, 1);
+            }
+
+            // ใส่เอฟเฟกต์หมุนและยืดหดตัวตาม Animation
+            this.ctx.rotate(p.rotation);
+            this.ctx.scale(p.scaleX, p.scaleY);
+
+            // วาดรูปตัวละคร
+            this.ctx.drawImage(
+                this.playerImg,
+                -p.width / 2,
+                -p.height / 2,
+                p.width,
+                p.height
+            );
+
+            this.ctx.restore();
+        } else {
+            // Fallback สี่เหลี่ยมเดิมกรณีรูปยังโหลดไม่เสร็จ
+            this.ctx.fillStyle = p.color;
+            this.ctx.fillRect(p.x, p.y, p.width, p.height);
+            this.ctx.fillStyle = '#ffffff';
+            const eyeOffset = this.keys.left ? 3 : (this.keys.right ? 13 : 8);
+            this.ctx.fillRect(p.x + eyeOffset, p.y + 6, 4, 4);
+        }
     }
 
     gameLoop() {
