@@ -116,8 +116,8 @@ class PlatformerGame {
         this.enemyImg = new Image();
         this.enemyImg.src = 'enemy.png';
 
-        // Physics Constants
-        this.GRAVITY = 0.38;
+        // Physics Constants (ปรับลดแรงโน้มถ่วงให้นุ่มนวลขึ้น)
+        this.GRAVITY = 0.32;
         
         // Game Entities
         this.player = null;
@@ -207,8 +207,8 @@ class PlatformerGame {
             this.particles.push({
                 x,
                 y,
-                vx: (Math.random() - 0.5) * 6,
-                vy: (Math.random() - 0.5) * 6 - 2,
+                vx: (Math.random() - 0.5) * 5,
+                vy: (Math.random() - 0.5) * 5 - 2,
                 size: Math.random() * 4 + 2,
                 color,
                 alpha: 1.0,
@@ -254,7 +254,8 @@ class PlatformerGame {
         if (level >= 11 && level <= 25) theme = 'volcano';
         if (level >= 26) theme = 'night';
 
-        const lavaSpeed = Math.min(0.52, 0.08 + (level - 1) * 0.0115);
+        // ปรับลดความเร็วลาวาลงให้นิดนึง
+        const lavaSpeed = Math.min(0.42, 0.06 + (level - 1) * 0.009);
         const targetTime = Math.max(10, 20 - Math.floor((level - 1) / 3));
 
         const allowedTypes = ['normal'];
@@ -302,7 +303,8 @@ class PlatformerGame {
                 platObj.isDestroyed = false;
                 platObj.respawnTimer = 0;
             } else if (pType === 'moving') {
-                platObj.vx = (i % 2 === 0 ? 1 : -1) * (1.1 + (level * 0.03));
+                // ปรับลดความเร็วแท่นเคลื่อนที่
+                platObj.vx = (i % 2 === 0 ? 1 : -1) * (0.8 + (level * 0.02));
                 platObj.minX = Math.max(10, platX - w * 0.15);
                 platObj.maxX = Math.min(w - platWidth - 10, platX + w * 0.15);
             }
@@ -347,7 +349,8 @@ class PlatformerGame {
                 height: 45,
                 hp: bossHp,
                 maxHp: bossHp,
-                vx: 1.8 + (level * 0.02),
+                // ปรับลดความเร็วบอส
+                vx: 1.3 + (level * 0.015),
                 minX: bossPlat.x,
                 maxX: bossPlat.x + bossPlat.width - 50,
                 shootTimer: 0,
@@ -362,7 +365,8 @@ class PlatformerGame {
                     y: topPlat.y - 28,
                     width: 32,
                     height: 28,
-                    vx: isRanged ? 0 : (1.0 + level * 0.025),
+                    // ปรับลดความเร็วศัตรู
+                    vx: isRanged ? 0 : (0.75 + level * 0.018),
                     minX: topPlat.x,
                     maxX: topPlat.x + topPlat.width - 32,
                     isDefeated: false,
@@ -378,7 +382,8 @@ class PlatformerGame {
                     y: midPlat.y - 28,
                     width: 32,
                     height: 28,
-                    vx: 1.2 + (level * 0.02),
+                    // ปรับลดความเร็วศัตรู
+                    vx: 0.9 + (level * 0.015),
                     minX: midPlat.x,
                     maxX: midPlat.x + midPlat.width - 32,
                     isDefeated: false,
@@ -498,8 +503,9 @@ class PlatformerGame {
             height: 36,
             vx: 0,
             vy: 0,
-            speed: 4.8,
-            jumpPower: -7.5,
+            // ปรับลดความเร็วการเดินและความแรงกระโดดให้รับกับแรงโน้มถ่วงใหม่
+            speed: 4.0,
+            jumpPower: -6.8,
             isGrounded: false,
             color: '#ef4444',
             
@@ -552,7 +558,7 @@ class PlatformerGame {
         p.x = this.spawnPoint.x;
         p.y = this.spawnPoint.y;
         p.vx = 0;
-        p.vy = -6;
+        p.vy = -5.5;
         p.invincibleTimer = 60;
         p.hasShield = true;
         this.triggerShake(10, 15);
@@ -684,7 +690,7 @@ class PlatformerGame {
 
         if (p.hasShield) {
             p.hasShield = false;
-            p.vy = -8;
+            p.vy = -7;
             p.invincibleTimer = 50;
             this.sfx.playHit();
             this.triggerShake(8, 12);
@@ -809,7 +815,7 @@ class PlatformerGame {
         const currentSpeed = p.boostTimer > 0 ? p.speed * 1.5 : p.speed;
 
         if (p.isDashing) {
-            p.vx = p.facing === 'right' ? currentSpeed * 2.8 : -currentSpeed * 2.8;
+            p.vx = p.facing === 'right' ? currentSpeed * 2.4 : -currentSpeed * 2.4;
             p.vy = 0;
             p.dashTimer--;
             if (p.dashTimer <= 0) p.isDashing = false;
@@ -847,10 +853,10 @@ class PlatformerGame {
         if (!p.isGrounded && p.vy > 0) {
             if (p.x <= 0 && this.keys.left) {
                 p.isWallSliding = true;
-                p.vy = 1.5;
+                p.vy = 1.3;
             } else if (p.x + p.width >= this.canvas.width && this.keys.right) {
                 p.isWallSliding = true;
-                p.vy = 1.5;
+                p.vy = 1.3;
             }
         }
 
@@ -894,7 +900,7 @@ class PlatformerGame {
                 p.vy >= 0
             ) {
                 if (plat.type === 'bounce') {
-                    p.vy = -13.0;
+                    p.vy = -11.5;
                     p.isGrounded = false;
                     p.jumpsLeft = 1;
                     this.sfx.playJump();
@@ -919,8 +925,8 @@ class PlatformerGame {
                     }
                 }
 
-                if (plat.type === 'conveyor_left') p.x -= 2.2;
-                if (plat.type === 'conveyor_right') p.x += 2.2;
+                if (plat.type === 'conveyor_left') p.x -= 1.8;
+                if (plat.type === 'conveyor_right') p.x += 1.8;
             }
 
             if (plat.isCrumbling) {
@@ -947,8 +953,9 @@ class PlatformerGame {
                 this.projectiles.push({
                     x: b.x + b.width / 2,
                     y: b.y + b.height / 2,
-                    vx: (p.x < b.x) ? -3.5 : 3.5,
-                    vy: -1.2,
+                    // ปรับลดความเร็วกระสุนบอส
+                    vx: (p.x < b.x) ? -2.6 : 2.6,
+                    vy: -1.0,
                     radius: 7,
                     color: '#f97316'
                 });
@@ -962,7 +969,7 @@ class PlatformerGame {
             ) {
                 if (p.vy > 0 && (p.y + p.height - p.vy) <= b.y + 16) {
                     b.hp--;
-                    p.vy = -10.5;
+                    p.vy = -9.0;
                     this.sfx.playHit();
                     this.triggerShake(12, 16);
                     this.hitFreezeTimer = 6;
@@ -1001,7 +1008,8 @@ class PlatformerGame {
                     this.projectiles.push({
                         x: enemy.x + enemy.width / 2,
                         y: enemy.y + enemy.height / 2,
-                        vx: -3.2,
+                        // ปรับลดความเร็วกระสุนศัตรู
+                        vx: -2.5,
                         vy: 0,
                         radius: 5,
                         color: '#ef4444'
@@ -1019,7 +1027,7 @@ class PlatformerGame {
             ) {
                 if (p.vy > 0 && (p.y + p.height - p.vy) <= enemy.y + 12) {
                     enemy.isDefeated = true;
-                    p.vy = -10.0;
+                    p.vy = -8.5;
                     store.addScore(50);
                     this.sfx.playHit();
                     this.triggerShake(10, 14);
@@ -1091,8 +1099,8 @@ class PlatformerGame {
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
                 if (magnetDist > 0 && dist < magnetDist) {
-                    coin.x += (dx / dist) * -4.5;
-                    coin.y += (dy / dist) * -4.5;
+                    coin.x += (dx / dist) * -3.8;
+                    coin.y += (dy / dist) * -3.8;
                 }
 
                 if (dist < coin.radius + p.width / 2) {
@@ -1167,7 +1175,7 @@ class PlatformerGame {
             p.scaleY = 1.15;
             p.rotation = p.vx * 0.03;
         } else if (p.vx !== 0) {
-            p.walkTimer += 0.25;
+            p.walkTimer += 0.22;
             p.rotation = Math.sin(p.walkTimer) * 0.15;
             p.scaleX = 1 + Math.sin(p.walkTimer) * 0.08;
             p.scaleY = 1 - Math.sin(p.walkTimer) * 0.08;
