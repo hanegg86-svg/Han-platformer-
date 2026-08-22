@@ -372,9 +372,9 @@ class PlatformerGame {
 
         // 1. Vibrant Sky Linear Gradient
         const skyGrad = this.ctx.createLinearGradient(0, 0, 0, h);
-        skyGrad.addColorStop(0, '#0284c7');   // ฟ้าเข้มด้านบน
-        skyGrad.addColorStop(0.5, '#38bdf8'); // ฟ้าสดใสกลางจอ
-        skyGrad.addColorStop(1, '#e0f2fe');   // ฟ้านวลสว่างบริเวณขอบฟ้า
+        skyGrad.addColorStop(0, '#0284c7');
+        skyGrad.addColorStop(0.5, '#38bdf8');
+        skyGrad.addColorStop(1, '#e0f2fe');
         this.ctx.fillStyle = skyGrad;
         this.ctx.fillRect(0, 0, w, h);
 
@@ -395,7 +395,7 @@ class PlatformerGame {
         this.ctx.arc(sunX, sunY, 22, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // 3. Fluffy Clouds (ก้อนเมฆนุ่มๆ 3 จุด)
+        // 3. Fluffy Clouds
         const clouds = [
             { x: w * 0.12, y: 70, scale: 0.85 },
             { x: w * 0.48, y: 115, scale: 1.1 },
