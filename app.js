@@ -451,7 +451,7 @@ class PlatformerGame {
             vx: 0,
             vy: 0,
             speed: 4.8,
-            jumpPower: -11.0,
+            jumpPower: -9.5, // ปรับลดค่าความสูงกระโดดลงจาก -11.0
             isGrounded: false,
             color: '#ef4444',
             
