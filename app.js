@@ -446,12 +446,12 @@ class PlatformerGame {
         this.player = {
             x: this.spawnPoint.x,
             y: this.spawnPoint.y,
-            width: 60,
-            height: 60,
+            width: 36,  // 👈 แก้ไข: ลดขนาดความกว้างลงเหลือ 36 ให้พอดีกับแท่น
+            height: 36, // 👈 แก้ไข: ลดขนาดความสูงลงเหลือ 36 ให้สัดส่วนสมจริง
             vx: 0,
             vy: 0,
             speed: 4.8,
-            jumpPower: -7.5, // 👈 ปรับจุดนี้! ลดแรงกระโดดลงจาก -9.5 เหลือ -7.5 เพื่อให้กระโดดเตี้ยลง
+            jumpPower: -7.5,
             isGrounded: false,
             color: '#ef4444',
             
@@ -1443,9 +1443,10 @@ class PlatformerGame {
                 // Flash when invincible
             } else {
                 this.ctx.save();
-                const centerX = p.x + p.width / 2;
-                const centerY = p.y + p.height / 2;
-                this.ctx.translate(centerX, centerY);
+                // 👈 แก้ไข: เปลี่ยนจุดอ้างอิงเป็นขอบล่างเท้า (feetX, feetY) เพื่อให้ยืนบนแท่นพอดี
+                const feetX = p.x + p.width / 2;
+                const feetY = p.y + p.height;
+                this.ctx.translate(feetX, feetY);
 
                 if (p.facing === 'left') {
                     this.ctx.scale(-1, 1);
@@ -1456,7 +1457,7 @@ class PlatformerGame {
 
                 if (p.hasShield) {
                     this.ctx.beginPath();
-                    this.ctx.arc(0, 0, p.width / 1.8, 0, Math.PI * 2);
+                    this.ctx.arc(0, -p.height / 2, p.width / 1.4, 0, Math.PI * 2);
                     this.ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
                     this.ctx.fill();
                     this.ctx.strokeStyle = '#38bdf8';
@@ -1467,7 +1468,7 @@ class PlatformerGame {
                 this.ctx.drawImage(
                     this.playerImg,
                     -p.width / 2,
-                    -p.height / 2,
+                    -p.height, // 👈 แก้ไข: วาดภาพพุ่งขึ้นด้านบนจากจุดยึดเท้า
                     p.width,
                     p.height
                 );
