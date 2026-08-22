@@ -136,10 +136,11 @@ class PlatformerGame {
         this.goal = null;
 
         // Camera System
-        this.cameraY = 0; // 👈 ตำแหน่งแกน Y ของมุมกล้อง
+        this.cameraY = 0;
 
         // Visual Polish & Juice System
         this.particles = [];
+        this.weatherParticles = [];
         this.floatingTexts = [];
         this.shakeTimer = 0;
         this.shakeIntensity = 0;
@@ -453,12 +454,25 @@ class PlatformerGame {
         const h = this.canvas.height || 400;
 
         this.levelTime = 0;
-        this.cameraY = 0; // 👈 รีเซ็ตกล้องใหม่อยู่ด้านล่างสุด
+        this.cameraY = 0;
         this.particles = [];
+        this.weatherParticles = [];
         this.floatingTexts = [];
         this.projectiles = [];
         this.comboCount = 0;
         this.comboTimer = 0;
+
+        // Initialize Ambient Weather Particles
+        for (let i = 0; i < 20; i++) {
+            this.weatherParticles.push({
+                x: Math.random() * w,
+                y: Math.random() * h,
+                vx: (Math.random() - 0.5) * 0.8,
+                vy: Math.random() * 0.6 + 0.2,
+                size: Math.random() * 2.5 + 1,
+                alpha: Math.random() * 0.6 + 0.2
+            });
+        }
 
         const currentLevel = store.getState().level;
 
@@ -604,7 +618,7 @@ class PlatformerGame {
             p.jumpBufferTimer = 0;
             p.jumpsLeft = 1;
             this.sfx.playJump();
-            this.addParticles(p.x + p.width / 2, p.y + p.height, '#ffffff', 6);
+            this.addParticles(p.x + p.width / 2, p.y + p.height, '#ffffff', 8);
             return true;
         } else if (p.isWallSliding) {
             p.vy = p.jumpPower;
@@ -618,7 +632,7 @@ class PlatformerGame {
             p.jumpsLeft--;
             p.jumpBufferTimer = 0;
             this.sfx.playJump();
-            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 8);
+            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 10);
             return true;
         }
         return false;
@@ -697,9 +711,9 @@ class PlatformerGame {
 
         this.levelTime++;
 
-        // 👈 คำนวณขยับกล้องเลื่อนขึ้น-ลงตามตำแหน่งผู้เล่น (Vertical Camera Tracking)
+        // Smooth Camera Tracking (Lerp Y-Axis)
         const targetCamY = Math.min(0, p.y - this.canvas.height * 0.45);
-        this.cameraY += (targetCamY - this.cameraY) * 0.1; // Smooth Lerp
+        this.cameraY += (targetCamY - this.cameraY) * 0.1;
 
         if (this.lava) {
             const lavaDist = this.lava.y - (p.y + p.height);
@@ -736,7 +750,20 @@ class PlatformerGame {
             p.coyoteTimer--;
         }
 
-        // Update Particles
+        // Update Weather Particles
+        this.weatherParticles.forEach(wp => {
+            if (this.currentTheme === 'volcano') {
+                wp.y -= wp.vy * 1.5;
+                wp.x += wp.vx;
+                if (wp.y < 0) wp.y = this.canvas.height;
+            } else {
+                wp.y += wp.vy;
+                wp.x += wp.vx;
+                if (wp.y > this.canvas.height) wp.y = 0;
+            }
+        });
+
+        // Update Standard Particles
         this.particles.forEach(pt => {
             pt.x += pt.vx;
             pt.y += pt.vy;
@@ -804,16 +831,16 @@ class PlatformerGame {
         p.x += p.vx;
         p.y += p.vy;
 
-        // Trail FX
+        // Enhanced Trail FX
         if (p.vx !== 0 || p.vy !== 0 || p.isDashing) {
             p.trail.push({
                 x: p.x + p.width / 2,
                 y: p.y + p.height / 2,
-                alpha: 0.5,
+                alpha: 0.6,
                 color: state.selectedSkin === 'electric' ? '#38bdf8' : (state.selectedSkin === 'gold' ? '#facc15' : '#ef4444')
             });
         }
-        p.trail.forEach(t => t.alpha -= 0.04);
+        p.trail.forEach(t => t.alpha -= 0.05);
         p.trail = p.trail.filter(t => t.alpha > 0);
 
         p.isWallSliding = false;
@@ -830,7 +857,7 @@ class PlatformerGame {
         if (p.x < 0) p.x = 0;
         if (p.x + p.width > this.canvas.width) p.x = this.canvas.width - p.width;
 
-        // Platforms Mechanics & Respawn System
+        // Platforms Mechanics
         p.isGrounded = false;
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) {
@@ -906,7 +933,7 @@ class PlatformerGame {
             }
         });
 
-        // BOSS Update & Combat Logic
+        // BOSS Combat Logic
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             b.x += b.vx;
@@ -1019,21 +1046,6 @@ class PlatformerGame {
         });
         this.projectiles = this.projectiles.filter(pj => !pj.hit && pj.x > -20 && pj.x < this.canvas.width + 20);
 
-        // Spring Mechanics
-        this.springs.forEach(sp => {
-            if (
-                p.x < sp.x + sp.width &&
-                p.x + p.width > sp.x &&
-                p.y + p.height >= sp.y &&
-                p.y + p.height <= sp.y + sp.height + p.vy
-            ) {
-                p.vy = -14.5;
-                p.jumpsLeft = 1;
-                this.sfx.playJump();
-                this.addParticles(sp.x + sp.width / 2, sp.y, '#ec4899', 10);
-            }
-        });
-
         // Key Collection
         if (this.keyItem && !this.keyItem.collected) {
             if (
@@ -1070,7 +1082,7 @@ class PlatformerGame {
             }
         });
 
-        // Coins Collection with Combo Multiplier System
+        // Coins Collection
         const magnetDist = (p.magnetTimer > 0) ? (p.magnetRadius || 200) : 0;
         this.coins.forEach(coin => {
             if (!coin.collected) {
@@ -1192,6 +1204,14 @@ class PlatformerGame {
             this.ctx.lineTo(w, h);
             this.ctx.fill();
 
+            // Volcano Embers
+            this.weatherParticles.forEach(wp => {
+                this.ctx.fillStyle = `rgba(249, 115, 22, ${wp.alpha})`;
+                this.ctx.beginPath();
+                this.ctx.arc(wp.x, wp.y, wp.size, 0, Math.PI * 2);
+                this.ctx.fill();
+            });
+
             const glowGrad = this.ctx.createRadialGradient(w / 2, h, 20, w / 2, h, h * 0.85);
             glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.45)');
             glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -1219,15 +1239,12 @@ class PlatformerGame {
             this.ctx.arc(moonX, moonY, 22, 0, Math.PI * 2);
             this.ctx.fill();
 
-            const stars = [
-                { x: w * 0.1, y: 40, s: 2 }, { x: w * 0.35, y: 80, s: 1.5 }, 
-                { x: w * 0.55, y: 35, s: 2.5 }, { x: w * 0.72, y: 110, s: 1.8 },
-                { x: w * 0.22, y: 130, s: 2 }, { x: w * 0.9, y: 45, s: 1.2 }
-            ];
-            stars.forEach((st, idx) => {
-                const twinkle = Math.sin(time * 3 + idx) * 0.4 + 0.6;
-                this.ctx.fillStyle = `rgba(255, 255, 255, ${twinkle})`;
-                this.ctx.fillRect(st.x, st.y, st.s, st.s);
+            // Twinkling Ambient Dust/Stars
+            this.weatherParticles.forEach(wp => {
+                this.ctx.fillStyle = `rgba(224, 231, 255, ${wp.alpha * (Math.sin(time * 2 + wp.x) * 0.3 + 0.7)})`;
+                this.ctx.beginPath();
+                this.ctx.arc(wp.x, wp.y, wp.size, 0, Math.PI * 2);
+                this.ctx.fill();
             });
 
             this.ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
@@ -1269,7 +1286,7 @@ class PlatformerGame {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 1. Draw Fixed Background (Screen Space)
+        // 1. Draw Fixed Background
         this.drawDynamicBackground();
 
         if (this.isGameCleared) {
@@ -1285,7 +1302,7 @@ class PlatformerGame {
             return;
         }
 
-        // 2. Apply Camera & Screen Shake (World Space Translation)
+        // 2. Apply Camera & Screen Shake
         this.ctx.save();
 
         if (this.shakeTimer > 0) {
@@ -1294,7 +1311,6 @@ class PlatformerGame {
             this.ctx.translate(rx, ry);
         }
 
-        // 👈 เลื่อนตำแหน่งการวาดวัตถุทั้งหมดตามแกน Y ของกล้อง
         this.ctx.translate(0, -this.cameraY);
 
         // Render Particles
@@ -1330,10 +1346,10 @@ class PlatformerGame {
             this.ctx.fill();
         }
 
-        // Render Lava
+        // Render Lava with Visual Polish
         if (this.lava) {
             this.ctx.save();
-            this.ctx.shadowBlur = 15;
+            this.ctx.shadowBlur = 20;
             this.ctx.shadowColor = '#f97316';
 
             const lavaGrad = this.ctx.createLinearGradient(0, this.lava.y, 0, this.canvas.height);
@@ -1346,7 +1362,7 @@ class PlatformerGame {
             this.ctx.moveTo(0, this.lava.y);
 
             for (let x = 0; x <= this.canvas.width; x += 8) {
-                const waveY = this.lava.y + Math.sin((x + this.levelTime * 4) * 0.04) * 4;
+                const waveY = this.lava.y + Math.sin((x + this.levelTime * 4) * 0.04) * 5;
                 this.ctx.lineTo(x, waveY);
             }
             this.ctx.lineTo(this.canvas.width, this.canvas.height + 800);
@@ -1355,7 +1371,7 @@ class PlatformerGame {
             this.ctx.fill();
 
             this.ctx.strokeStyle = '#fef08a';
-            this.ctx.lineWidth = 2.5;
+            this.ctx.lineWidth = 3;
             this.ctx.stroke();
             this.ctx.restore();
         }
@@ -1365,7 +1381,7 @@ class PlatformerGame {
             this.ctx.save();
             const isLocked = this.goal.isLocked;
 
-            this.ctx.shadowBlur = 15;
+            this.ctx.shadowBlur = 18;
             this.ctx.shadowColor = isLocked ? '#ef4444' : '#10b981';
 
             this.ctx.fillStyle = isLocked ? '#334155' : '#065f46';
@@ -1401,7 +1417,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Platforms
+        // Render Platforms with Polished Highlights
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
             if (plat.type === 'phase' && !plat.active) return;
@@ -1412,6 +1428,8 @@ class PlatformerGame {
             if (plat.type === 'bounce') {
                 bodyGrad = '#7e22ce';
                 topColor = '#f472b6';
+                this.ctx.shadowBlur = 8;
+                this.ctx.shadowColor = '#f472b6';
             } else if (plat.type === 'ice') {
                 bodyGrad = '#0284c7';
                 topColor = '#bae6fd';
@@ -1476,7 +1494,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // Render BOSS Entity & HP Bar
+        // Render BOSS Entity
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             this.ctx.save();
@@ -1562,7 +1580,7 @@ class PlatformerGame {
         // Render Projectiles
         this.projectiles.forEach(pj => {
             this.ctx.save();
-            this.ctx.shadowBlur = 8;
+            this.ctx.shadowBlur = 10;
             this.ctx.shadowColor = pj.color;
             this.ctx.beginPath();
             this.ctx.arc(pj.x, pj.y, pj.radius, 0, Math.PI * 2);
@@ -1624,7 +1642,7 @@ class PlatformerGame {
                 this.ctx.translate(coin.x, coin.y);
                 this.ctx.scale(spinScale, 1);
 
-                this.ctx.shadowBlur = 8;
+                this.ctx.shadowBlur = 10;
                 this.ctx.shadowColor = '#facc15';
                 this.ctx.beginPath();
                 this.ctx.arc(0, 0, coin.radius, 0, Math.PI * 2);
@@ -1638,7 +1656,7 @@ class PlatformerGame {
             }
         });
 
-        // Render Animated Player
+        // Render Player with Dynamic Skin Aura & Shadows
         if (this.playerImg.complete && this.playerImg.naturalWidth !== 0) {
             if (p.invincibleTimer > 0 && Math.floor(p.invincibleTimer / 4) % 2 === 0) {
                 // Flash when invincible
@@ -1657,6 +1675,12 @@ class PlatformerGame {
 
                 const renderW = p.width * 2.0;
                 const renderH = p.height * 2.0;
+
+                // Skin-Specific Dynamic Glow Aura
+                const skin = store.getState().selectedSkin;
+                const auraColor = skin === 'electric' ? '#38bdf8' : (skin === 'gold' ? '#facc15' : '#ef4444');
+                this.ctx.shadowBlur = 14;
+                this.ctx.shadowColor = auraColor;
 
                 if (p.hasShield) {
                     this.ctx.beginPath();
@@ -1689,10 +1713,9 @@ class PlatformerGame {
             this.ctx.globalAlpha = 1.0;
         });
 
-        // 👈 คืนค่าการแปลงพิกัด World Space เพื่อกลับมาวาด HUD บนหน้าจอคงที่
         this.ctx.restore();
 
-        // 3. Render HUD Info & Overlays (Screen Space Fixed)
+        // 3. Render HUD Info & Overlays
         const elapsed = Math.floor(this.levelTime / 60);
         this.ctx.font = 'bold 12px sans-serif';
         this.ctx.fillStyle = elapsed > this.targetTime ? '#ef4444' : '#ffffff';
