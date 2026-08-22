@@ -55,6 +55,26 @@
                 </div>
             </section>
 
+            <!-- Shop Tab View -->
+            <section id="view-shop" class="tab-view">
+                <div class="card">
+                    <div class="shop-header">
+                        <h2>ร้านค้าไอเทม</h2>
+                        <div class="coin-balance">🪙 เหรียญสะสม: <strong id="shop-coins">0</strong></div>
+                    </div>
+                    
+                    <h3 class="shop-section-title">🎨 สกินตัวละคร</h3>
+                    <div class="shop-grid" id="skins-grid">
+                        <!-- Skin items rendered dynamically -->
+                    </div>
+
+                    <h3 class="shop-section-title" style="margin-top: 20px;">⚡ อัปเกรดความสามารถ</h3>
+                    <div class="shop-grid" id="upgrades-grid">
+                        <!-- Upgrade items rendered dynamically -->
+                    </div>
+                </div>
+            </section>
+
             <!-- Stats Tab View -->
             <section id="view-stats" class="tab-view">
                 <div class="card">
@@ -66,6 +86,10 @@
                     <div class="stat-row">
                         <span>จำนวนครั้งที่เล่น:</span>
                         <strong id="stats-games-played">0</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>เหรียญสะสมทั้งหมด:</span>
+                        <strong id="stats-coins">0</strong>
                     </div>
                 </div>
             </section>
@@ -88,6 +112,10 @@
             <button class="nav-btn active" data-tab="game">
                 <span class="nav-icon">🎮</span>
                 <span class="nav-label">เล่นเกม</span>
+            </button>
+            <button class="nav-btn" data-tab="shop">
+                <span class="nav-icon">🛒</span>
+                <span class="nav-label">ร้านค้า</span>
             </button>
             <button class="nav-btn" data-tab="stats">
                 <span class="nav-icon">🏆</span>

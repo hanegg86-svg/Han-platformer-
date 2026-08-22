@@ -9,6 +9,8 @@ class Store {
             isGameOver: false,
             level: 1,
             selectedSkin: localStorage.getItem('platformer_skin') || 'fire', // 'fire', 'electric', 'gold'
+            ownedSkins: JSON.parse(localStorage.getItem('platformer_owned_skins') || '["fire"]'),
+            upgrades: JSON.parse(localStorage.getItem('platformer_upgrades') || '{"dashLevel": 0, "magnetLevel": 0}'),
             coinsCount: parseInt(localStorage.getItem('platformer_coins') || '0', 10)
         };
         this.listeners = [];
@@ -47,9 +49,38 @@ class Store {
     }
 
     setSkin(skinId) {
-        this.state.selectedSkin = skinId;
-        localStorage.setItem('platformer_skin', skinId);
-        this.notify();
+        if (this.state.ownedSkins.includes(skinId)) {
+            this.state.selectedSkin = skinId;
+            localStorage.setItem('platformer_skin', skinId);
+            this.notify();
+        }
+    }
+
+    buySkin(skinId, price) {
+        if (this.state.coinsCount >= price && !this.state.ownedSkins.includes(skinId)) {
+            this.state.coinsCount -= price;
+            this.state.ownedSkins.push(skinId);
+            this.state.selectedSkin = skinId;
+            localStorage.setItem('platformer_coins', this.state.coinsCount.toString());
+            localStorage.setItem('platformer_owned_skins', JSON.stringify(this.state.ownedSkins));
+            localStorage.setItem('platformer_skin', skinId);
+            this.notify();
+            return true;
+        }
+        return false;
+    }
+
+    buyUpgrade(type, price, maxLevel = 5) {
+        const currentLevel = this.state.upgrades[type] || 0;
+        if (currentLevel < maxLevel && this.state.coinsCount >= price) {
+            this.state.coinsCount -= price;
+            this.state.upgrades[type] = currentLevel + 1;
+            localStorage.setItem('platformer_coins', this.state.coinsCount.toString());
+            localStorage.setItem('platformer_upgrades', JSON.stringify(this.state.upgrades));
+            this.notify();
+            return true;
+        }
+        return false;
     }
 
     nextLevel() {
@@ -85,6 +116,8 @@ class Store {
         localStorage.removeItem('platformer_sound');
         localStorage.removeItem('platformer_skin');
         localStorage.removeItem('platformer_coins');
+        localStorage.removeItem('platformer_owned_skins');
+        localStorage.removeItem('platformer_upgrades');
         this.state = {
             activeTab: 'game',
             score: 0,
@@ -94,6 +127,8 @@ class Store {
             isGameOver: false,
             level: 1,
             selectedSkin: 'fire',
+            ownedSkins: ['fire'],
+            upgrades: { dashLevel: 0, magnetLevel: 0 },
             coinsCount: 0
         };
         this.notify();

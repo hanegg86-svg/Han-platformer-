@@ -245,13 +245,13 @@ canvas {
 
 .btn {
     width: 100%;
-    padding: 14px;
+    padding: 12px 14px;
     border-radius: 8px;
     border: none;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: bold;
     cursor: pointer;
-    transition: opacity 0.15s ease;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
 }
 
 .btn:active {
@@ -263,9 +263,118 @@ canvas {
     color: white;
 }
 
+.btn-secondary {
+    background-color: #38bdf8;
+    color: #0f172a;
+}
+
+.btn-buy {
+    background-color: #22c55e;
+    color: white;
+}
+
+.btn-disabled {
+    background-color: #64748b;
+    color: #cbd5e1;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
 .btn-danger {
     background-color: #dc2626;
     color: white;
+}
+
+/* Shop UI Styles */
+.shop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #475569;
+}
+
+.shop-header h2 {
+    margin-bottom: 0;
+}
+
+.coin-balance {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #facc15;
+    background-color: #1e293b;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid #475569;
+}
+
+.shop-section-title {
+    font-size: 1.05rem;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.shop-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.shop-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #1e293b;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid #475569;
+    gap: 12px;
+}
+
+.shop-item.equipped {
+    border-color: #facc15;
+    background-color: rgba(250, 204, 21, 0.08);
+}
+
+.shop-item-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
+.shop-item-info {
+    flex: 1;
+}
+
+.shop-item-info h4 {
+    font-size: 0.95rem;
+    color: #f8fafc;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.shop-item-info p {
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.shop-item-action {
+    width: 110px;
+    flex-shrink: 0;
+}
+
+.badge-level {
+    font-size: 0.75rem;
+    background-color: #0284c7;
+    color: #ffffff;
+    padding: 2px 6px;
+    border-radius: 6px;
 }
 
 /* Bottom Navigation */
@@ -380,5 +489,9 @@ canvas {
     .stat-row {
         font-size: 1.15rem;
         padding: 16px 0;
+    }
+
+    .shop-item-action {
+        width: 130px;
     }
 }
