@@ -296,7 +296,7 @@ class PlatformerGame {
                 platObj.timer = 0;
                 platObj.isCrumbling = false;
                 platObj.isDestroyed = false;
-                platObj.respawnTimer = 0; // 👈 กำหนดตัวแปรรอเกิดใหม่
+                platObj.respawnTimer = 0;
             } else if (pType === 'moving') {
                 platObj.vx = (i % 2 === 0 ? 1 : -1) * (1.1 + (level * 0.03));
                 platObj.minX = Math.max(10, platX - w * 0.15);
@@ -824,7 +824,6 @@ class PlatformerGame {
         // Platforms Mechanics & Respawn System
         p.isGrounded = false;
         this.platforms.forEach(plat => {
-            // 👈 ระบบ Respawn แท่นพัง: นับเวลางอกแท่นกลับคืนมาเพื่อไม่ให้ติดเกาะ
             if (plat.isDestroyed) {
                 if (plat.type === 'crumble') {
                     plat.respawnTimer = (plat.respawnTimer || 180) - 1;
@@ -892,7 +891,7 @@ class PlatformerGame {
                 plat.timer++;
                 if (plat.timer > 50) {
                     plat.isDestroyed = true;
-                    plat.respawnTimer = 180; // 👈 ตั้งเวลารอเกิดใหม่ 3 วินาที (180 เฟรม)
+                    plat.respawnTimer = 180;
                     this.addParticles(plat.x + plat.width / 2, plat.y, '#451a03', 15);
                 }
             }
@@ -1438,6 +1437,28 @@ class PlatformerGame {
                 this.ctx.fillRect(plat.x, plat.y, plat.width, 4);
             }
 
+            this.ctx.restore();
+        });
+
+        // 👈 Render Spikes (แก้ไขเพิ่มโค้ดวาดหนามสีแดง)
+        this.spikes.forEach(spike => {
+            this.ctx.save();
+            this.ctx.fillStyle = '#dc2626';
+            this.ctx.strokeStyle = '#7f1d1d';
+            this.ctx.lineWidth = 1;
+
+            const count = Math.max(1, Math.floor(spike.width / 12));
+            const spikeW = spike.width / count;
+
+            for (let i = 0; i < count; i++) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(spike.x + i * spikeW, spike.y + spike.height);
+                this.ctx.lineTo(spike.x + (i + 0.5) * spikeW, spike.y);
+                this.ctx.lineTo(spike.x + (i + 1) * spikeW, spike.y + spike.height);
+                this.ctx.closePath();
+                this.ctx.fill();
+                this.ctx.stroke();
+            }
             this.ctx.restore();
         });
 
