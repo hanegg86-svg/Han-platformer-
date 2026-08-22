@@ -2,6 +2,7 @@ import { store } from './store.js';
 
 export class UIManager {
     constructor() {
+        this.hudLevel = document.getElementById('hud-level');
         this.hudScore = document.getElementById('hud-score');
         this.hudHighScore = document.getElementById('hud-highscore');
         this.statsHighScore = document.getElementById('stats-highscore');
@@ -47,6 +48,7 @@ export class UIManager {
 
     render(state) {
         // Synchronize HUD & Stats Text
+        if (this.hudLevel) this.hudLevel.textContent = state.level;
         this.hudScore.textContent = state.score;
         this.hudHighScore.textContent = state.highScore;
         this.statsHighScore.textContent = state.highScore;

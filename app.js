@@ -17,6 +17,8 @@ class PlatformerGame {
         this.player = null;
         this.platforms = [];
         this.coins = [];
+        this.spikes = [];
+        this.goal = null;
 
         this.init();
     }
@@ -44,6 +46,78 @@ class PlatformerGame {
         this.canvas.height = container.clientHeight;
     }
 
+    getLevelData(level, w, h) {
+        const levels = [
+            // ด่าน 1: เริ่มต้น เรียนรู้ระบบกระโดดไปยังเป้าหมาย
+            {
+                platforms: [
+                    { x: 0, y: h - 20, width: w, height: 20 },
+                    { x: 40, y: h - 90, width: 100, height: 14 },
+                    { x: 180, y: h - 160, width: 100, height: 14 },
+                    { x: 60, y: h - 230, width: 100, height: 14 },
+                    { x: 210, y: h - 300, width: 110, height: 14 }
+                ],
+                coins: [
+                    { x: 80, y: h - 120, radius: 8, collected: false },
+                    { x: 220, y: h - 190, radius: 8, collected: false },
+                    { x: 100, y: h - 260, radius: 8, collected: false }
+                ],
+                spikes: [],
+                goal: { x: 250, y: h - 340, width: 30, height: 40 }
+            },
+            // ด่าน 2: เพิ่มอุปสรรคหนามบนพื้นและบนแท่น
+            {
+                platforms: [
+                    { x: 0, y: h - 20, width: w, height: 20 },
+                    { x: 30, y: h - 80, width: 80, height: 14 },
+                    { x: 160, y: h - 140, width: 80, height: 14 },
+                    { x: 260, y: h - 210, width: 80, height: 14 },
+                    { x: 120, y: h - 280, width: 100, height: 14 },
+                    { x: 10, y: h - 330, width: 80, height: 14 }
+                ],
+                coins: [
+                    { x: 200, y: h - 170, radius: 8, collected: false },
+                    { x: 170, y: h - 310, radius: 8, collected: false }
+                ],
+                spikes: [
+                    { x: 170, y: h - 154, width: 30, height: 14 },
+                    { x: 120, y: h - 34, width: 100, height: 14 }
+                ],
+                goal: { x: 35, y: h - 370, width: 30, height: 40 }
+            },
+            // ด่าน 3: เพิ่มความยากของการกระโดดและกับดักหนามขนาดใหญ่
+            {
+                platforms: [
+                    { x: 0, y: h - 20, width: w, height: 20 },
+                    { x: 50, y: h - 100, width: 70, height: 14 },
+                    { x: 180, y: h - 180, width: 70, height: 14 },
+                    { x: 50, y: h - 260, width: 70, height: 14 },
+                    { x: 180, y: h - 340, width: 100, height: 14 }
+                ],
+                coins: [
+                    { x: 80, y: h - 130, radius: 8, collected: false },
+                    { x: 210, y: h - 210, radius: 8, collected: false },
+                    { x: 80, y: h - 290, radius: 8, collected: false }
+                ],
+                spikes: [
+                    { x: 50, y: h - 34, width: Math.max(50, w - 100), height: 14 },
+                    { x: 200, y: h - 194, width: 30, height: 14 }
+                ],
+                goal: { x: 220, y: h - 380, width: 30, height: 40 }
+            }
+        ];
+
+        const index = (level - 1) % levels.length;
+        const selected = levels[index];
+
+        return {
+            platforms: selected.platforms.map(p => ({ ...p })),
+            coins: selected.coins.map(c => ({ ...c })),
+            spikes: selected.spikes.map(s => ({ ...s })),
+            goal: { ...selected.goal }
+        };
+    }
+
     resetEntities() {
         const w = this.canvas.width || 360;
         const h = this.canvas.height || 400;
@@ -61,22 +135,13 @@ class PlatformerGame {
             color: '#ef4444'
         };
 
-        // Static Level Platforms Layout
-        this.platforms = [
-            { x: 0, y: h - 20, width: w, height: 20 },
-            { x: 40, y: h - 90, width: 90, height: 14 },
-            { x: 170, y: h - 150, width: 100, height: 14 },
-            { x: 50, y: h - 220, width: 110, height: 14 },
-            { x: 210, y: h - 280, width: 90, height: 14 }
-        ];
+        const currentLevel = store.getState().level;
+        const levelData = this.getLevelData(currentLevel, w, h);
 
-        // Collectible Coins Layout
-        this.coins = [
-            { x: 75, y: h - 120, radius: 8, collected: false },
-            { x: 210, y: h - 180, radius: 8, collected: false },
-            { x: 90, y: h - 250, radius: 8, collected: false },
-            { x: 240, y: h - 310, radius: 8, collected: false }
-        ];
+        this.platforms = levelData.platforms;
+        this.coins = levelData.coins;
+        this.spikes = levelData.spikes;
+        this.goal = levelData.goal;
     }
 
     setupTouchControls() {
@@ -189,13 +254,38 @@ class PlatformerGame {
             }
         });
 
+        // Spike Obstacle Collision Detection (Game Over)
+        this.spikes.forEach(spike => {
+            if (
+                p.x < spike.x + spike.width &&
+                p.x + p.width > spike.x &&
+                p.y < spike.y + spike.height &&
+                p.y + p.height > spike.y
+            ) {
+                store.setGameOver(true);
+            }
+        });
+
+        // Goal Collision Detection (Reach Target to Pass Level)
+        if (
+            this.goal &&
+            p.x < this.goal.x + this.goal.width &&
+            p.x + p.width > this.goal.x &&
+            p.y < this.goal.y + this.goal.height &&
+            p.y + p.height > this.goal.y
+        ) {
+            store.addScore(100);
+            store.nextLevel();
+            this.resetEntities();
+        }
+
         // Check Fall Off Condition (Game Over)
         if (p.y > this.canvas.height + 40) {
             store.setGameOver(true);
         }
 
         // Auto Respawn Coins & Bonus Score
-        if (this.coins.every(c => c.collected)) {
+        if (this.coins.length > 0 && this.coins.every(c => c.collected)) {
             this.coins.forEach(c => c.collected = false);
             store.addScore(50);
         }
@@ -208,6 +298,14 @@ class PlatformerGame {
         this.ctx.fillStyle = '#0284c7';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Render Goal (ประตูสีเขียว)
+        if (this.goal) {
+            this.ctx.fillStyle = '#10b981';
+            this.ctx.fillRect(this.goal.x, this.goal.y, this.goal.width, this.goal.height);
+            this.ctx.fillStyle = '#fef08a';
+            this.ctx.fillRect(this.goal.x + this.goal.width - 8, this.goal.y + this.goal.height / 2 - 3, 5, 6);
+        }
+
         // Render Platforms
         this.platforms.forEach(plat => {
             this.ctx.fillStyle = '#334155';
@@ -215,6 +313,21 @@ class PlatformerGame {
             // Grass Accent Top Line
             this.ctx.fillStyle = '#22c55e';
             this.ctx.fillRect(plat.x, plat.y, plat.width, 3);
+        });
+
+        // Render Spikes (อุปสรรคหนามสีแดง)
+        this.spikes.forEach(spike => {
+            this.ctx.fillStyle = '#dc2626';
+            const count = Math.max(1, Math.floor(spike.width / 10));
+            const spikeW = spike.width / count;
+            for (let i = 0; i < count; i++) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(spike.x + i * spikeW, spike.y + spike.height);
+                this.ctx.lineTo(spike.x + (i + 0.5) * spikeW, spike.y);
+                this.ctx.lineTo(spike.x + (i + 1) * spikeW, spike.y + spike.height);
+                this.ctx.closePath();
+                this.ctx.fill();
+            }
         });
 
         // Render Coins

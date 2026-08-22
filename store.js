@@ -6,7 +6,8 @@ class Store {
             highScore: parseInt(localStorage.getItem('platformer_highscore') || '0', 10),
             gamesPlayed: parseInt(localStorage.getItem('platformer_games') || '0', 10),
             soundEnabled: JSON.parse(localStorage.getItem('platformer_sound') ?? 'true'),
-            isGameOver: false
+            isGameOver: false,
+            level: 1
         };
         this.listeners = [];
     }
@@ -40,6 +41,11 @@ class Store {
         this.notify();
     }
 
+    nextLevel() {
+        this.state.level += 1;
+        this.notify();
+    }
+
     setGameOver(isOver) {
         this.state.isGameOver = isOver;
         if (isOver) {
@@ -51,6 +57,7 @@ class Store {
 
     resetScore() {
         this.state.score = 0;
+        this.state.level = 1;
         this.state.isGameOver = false;
         this.notify();
     }
@@ -71,7 +78,8 @@ class Store {
             highScore: 0,
             gamesPlayed: 0,
             soundEnabled: true,
-            isGameOver: false
+            isGameOver: false,
+            level: 1
         };
         this.notify();
     }
