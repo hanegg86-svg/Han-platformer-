@@ -446,8 +446,8 @@ class PlatformerGame {
         this.player = {
             x: this.spawnPoint.x,
             y: this.spawnPoint.y,
-            width: 36,  // 👈 แก้ไข: ลดขนาดความกว้างลงเหลือ 36 ให้พอดีกับแท่น
-            height: 36, // 👈 แก้ไข: ลดขนาดความสูงลงเหลือ 36 ให้สัดส่วนสมจริง
+            width: 36,
+            height: 36,
             vx: 0,
             vy: 0,
             speed: 4.8,
@@ -824,7 +824,10 @@ class PlatformerGame {
                 }
             }
 
+            // 👈 แก้ไข: เช็กระดับเท้าตัวละคร ไม่ให้ชนศัตรูถ้าตัวละครยังอยู่ใต้แท่น
+            const isPlayerBelowPlatform = (p.y + p.height) > (enemy.y + enemy.height + 4);
             if (
+                !isPlayerBelowPlatform &&
                 p.x < enemy.x + enemy.width &&
                 p.x + p.width > enemy.x &&
                 p.y < enemy.y + enemy.height &&
@@ -875,7 +878,9 @@ class PlatformerGame {
 
         // Key Collection
         if (this.keyItem && !this.keyItem.collected) {
+            // 👈 แก้ไข: เช็กระดับเท้าตัวละคร ไม่ให้เก็บกุญแจได้จากการกระโดดชนจากใต้แท่น
             if (
+                (p.y + p.height) <= (this.keyItem.y + this.keyItem.height + 8) &&
                 p.x < this.keyItem.x + this.keyItem.width &&
                 p.x + p.width > this.keyItem.x &&
                 p.y < this.keyItem.y + this.keyItem.height &&
@@ -943,9 +948,11 @@ class PlatformerGame {
         });
 
         // Goal Collision
+        // 👈 แก้ไข: เช็กระดับเท้าตัวละคร ไม่ให้เข้าประตูได้ถ้าตัวละครยังอยู่ใต้แท่น
         if (
             this.goal &&
             !this.goal.isLocked &&
+            (p.y + p.height) <= (this.goal.y + this.goal.height + 6) &&
             p.x < this.goal.x + this.goal.width &&
             p.x + p.width > this.goal.x &&
             p.y < this.goal.y + this.goal.height &&
@@ -1443,7 +1450,6 @@ class PlatformerGame {
                 // Flash when invincible
             } else {
                 this.ctx.save();
-                // 👈 แก้ไข: เปลี่ยนจุดอ้างอิงเป็นขอบล่างเท้า (feetX, feetY) เพื่อให้ยืนบนแท่นพอดี
                 const feetX = p.x + p.width / 2;
                 const feetY = p.y + p.height;
                 this.ctx.translate(feetX, feetY);
@@ -1468,7 +1474,7 @@ class PlatformerGame {
                 this.ctx.drawImage(
                     this.playerImg,
                     -p.width / 2,
-                    -p.height, // 👈 แก้ไข: วาดภาพพุ่งขึ้นด้านบนจากจุดยึดเท้า
+                    -p.height,
                     p.width,
                     p.height
                 );
