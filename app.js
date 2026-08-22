@@ -18,8 +18,8 @@ class PlatformerGame {
         this.playerImg = new Image();
         this.playerImg.src = 'player.png';
 
-        // Physics Constants
-        this.GRAVITY = 0.45;
+        // Physics Constants (ปรับแรงโน้มถ่วงให้นุ่มนวลขึ้น)
+        this.GRAVITY = 0.38;
         
         // Game Entities
         this.player = null;
@@ -87,14 +87,14 @@ class PlatformerGame {
 
     getLevelData(level, w, h) {
         const levels = [
-            // ด่าน 1: สอนกุญแจ ล็อคประตู สปริง และแม่เหล็ก
+            // ด่าน 1: ขยายแท่นให้กว้างขึ้น
             {
                 platforms: [
                     { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: 20, y: h - 80, width: 90, height: 14, type: 'normal' },
-                    { x: 150, y: h - 150, width: 90, height: 14, type: 'moving', vx: 1.5, minX: 130, maxX: w - 100 },
-                    { x: 40, y: h - 230, width: 90, height: 14, type: 'normal' },
-                    { x: 200, y: h - 310, width: 110, height: 14, type: 'normal' }
+                    { x: 20, y: h - 80, width: 110, height: 14, type: 'normal' },
+                    { x: 140, y: h - 150, width: 110, height: 14, type: 'moving', vx: 1.2, minX: 110, maxX: w - 80 },
+                    { x: 30, y: h - 230, width: 110, height: 14, type: 'normal' },
+                    { x: 180, y: h - 310, width: 130, height: 14, type: 'normal' }
                 ],
                 coins: [
                     { x: 70, y: h - 110, radius: 8, collected: false },
@@ -103,33 +103,33 @@ class PlatformerGame {
                 ],
                 spikes: [],
                 springs: [
-                    { x: 95, y: h - 30, width: 24, height: 10 }
+                    { x: 95, y: h - 30, width: 28, height: 10 }
                 ],
                 powerups: [
                     { x: 50, y: h - 260, type: 'magnet', collected: false, radius: 10 }
                 ],
                 keyItem: { x: 50, y: h - 110, width: 20, height: 20, collected: false },
-                goal: { x: 250, y: h - 350, width: 30, height: 40, isLocked: true }
+                goal: { x: 230, y: h - 350, width: 30, height: 40, isLocked: true }
             },
-            // ด่าน 2: แท่นพัง โล่ป้องกัน และพุ่งตัว Dash
+            // ด่าน 2: ขยายแท่นพัง ลดปริมาณหนาม
             {
                 platforms: [
                     { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: 20, y: h - 80, width: 80, height: 14, type: 'normal' },
-                    { x: 140, y: h - 140, width: 70, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
-                    { x: 250, y: h - 210, width: 80, height: 14, type: 'normal' },
-                    { x: 120, y: h - 280, width: 90, height: 14, type: 'normal' },
-                    { x: 10, y: h - 340, width: 80, height: 14, type: 'normal' }
+                    { x: 20, y: h - 80, width: 100, height: 14, type: 'normal' },
+                    { x: 140, y: h - 140, width: 90, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
+                    { x: 250, y: h - 210, width: 100, height: 14, type: 'normal' },
+                    { x: 120, y: h - 280, width: 110, height: 14, type: 'normal' },
+                    { x: 10, y: h - 340, width: 100, height: 14, type: 'normal' }
                 ],
                 coins: [
                     { x: 170, y: h - 170, radius: 8, collected: false },
                     { x: 150, y: h - 310, radius: 8, collected: false }
                 ],
                 spikes: [
-                    { x: 130, y: h - 34, width: 100, height: 14 }
+                    { x: 140, y: h - 34, width: 70, height: 14 }
                 ],
                 springs: [
-                    { x: 280, y: h - 220, width: 24, height: 10 }
+                    { x: 280, y: h - 220, width: 28, height: 10 }
                 ],
                 powerups: [
                     { x: 40, y: h - 110, type: 'shield', collected: false, radius: 10 }
@@ -137,29 +137,28 @@ class PlatformerGame {
                 keyItem: { x: 280, y: h - 240, width: 20, height: 20, collected: false },
                 goal: { x: 30, y: h - 380, width: 30, height: 40, isLocked: true }
             },
-            // ด่าน 3: ไต่กำแพง Wall Jump แท่นเลื่อน และพาวเวอร์อัพสปีดไฟ
+            // ด่าน 3: เอาหนามที่ทับกุญแจออก ขยายแท่นให้เหยียบสบายขึ้น
             {
                 platforms: [
                     { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
-                    { x: 20, y: h - 80, width: 80, height: 14, type: 'normal' },
-                    { x: 180, y: h - 160, width: 80, height: 14, type: 'moving', vx: -1.8, minX: 140, maxX: w - 90 },
-                    { x: 40, y: h - 240, width: 70, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
-                    { x: 180, y: h - 320, width: 110, height: 14, type: 'normal' }
+                    { x: 20, y: h - 80, width: 100, height: 14, type: 'normal' },
+                    { x: 160, y: h - 160, width: 100, height: 14, type: 'moving', vx: -1.2, minX: 120, maxX: w - 80 },
+                    { x: 40, y: h - 240, width: 90, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
+                    { x: 170, y: h - 320, width: 120, height: 14, type: 'normal' }
                 ],
                 coins: [
                     { x: 210, y: h - 190, radius: 8, collected: false },
                     { x: 70, y: h - 270, radius: 8, collected: false }
                 ],
                 spikes: [
-                    { x: 130, y: h - 34, width: Math.max(50, w - 160), height: 14 },
-                    { x: 200, y: h - 174, width: 30, height: 14 }
+                    { x: 150, y: h - 34, width: Math.max(40, w - 200), height: 14 }
                 ],
                 springs: [],
                 powerups: [
                     { x: 50, y: h - 110, type: 'boost', collected: false, radius: 10 }
                 ],
-                keyItem: { x: 220, y: h - 190, width: 20, height: 20, collected: false },
-                goal: { x: 220, y: h - 360, width: 30, height: 40, isLocked: true }
+                keyItem: { x: 210, y: h - 190, width: 20, height: 20, collected: false },
+                goal: { x: 210, y: h - 360, width: 30, height: 40, isLocked: true }
             }
         ];
 
@@ -188,8 +187,8 @@ class PlatformerGame {
             height: 60,
             vx: 0,
             vy: 0,
-            speed: 4.2,
-            jumpPower: -10.5,
+            speed: 4.8,          // เพิ่มความเร็วเคลื่อนที่
+            jumpPower: -11.0,    // เพิ่มความสูงการกระโดด
             isGrounded: false,
             color: '#ef4444',
             
@@ -200,8 +199,8 @@ class PlatformerGame {
             dashCooldown: 0,
             isWallSliding: false,
 
-            // Active Power-ups State
-            hasShield: false,
+            // Active Power-ups State (ติดโล่ป้องกันให้ตั้งแต่เริ่มเกม!)
+            hasShield: true,
             magnetTimer: 0,
             boostTimer: 0,
 
@@ -278,13 +277,12 @@ class PlatformerGame {
         if (p.isGrounded) {
             p.vy = p.jumpPower;
             p.isGrounded = false;
-            p.jumpsLeft = 1; // ใช้ไป 1 ครั้ง เหลือดับเบิลจัมพ์
+            p.jumpsLeft = 1;
         } else if (p.isWallSliding) {
             p.vy = p.jumpPower;
             p.vx = p.facing === 'left' ? p.speed : -p.speed;
             p.isWallSliding = false;
         } else if (p.jumpsLeft > 0) {
-            // Double Jump
             p.vy = p.jumpPower * 0.9;
             p.jumpsLeft--;
         }
@@ -295,7 +293,7 @@ class PlatformerGame {
         if (p.dashCooldown <= 0 && !p.isDashing) {
             p.isDashing = true;
             p.dashTimer = 10;
-            p.dashCooldown = 60; // คูลดาวน์ 1 วินาที
+            p.dashCooldown = 30; // ลดคูลดาวน์พุ่งเหลือ 0.5 วินาที
         }
     }
 
@@ -409,10 +407,10 @@ class PlatformerGame {
                 }
             }
 
-            // Update Crumble Timers
+            // Update Crumble Timers (พังช้าลง)
             if (plat.isCrumbling) {
                 plat.timer++;
-                if (plat.timer > 30) {
+                if (plat.timer > 50) {
                     plat.isDestroyed = true;
                 }
             }
@@ -426,7 +424,7 @@ class PlatformerGame {
                 p.y + p.height >= sp.y &&
                 p.y + p.height <= sp.y + sp.height + p.vy
             ) {
-                p.vy = -14.5; // ดีดตัวขึ้นสูงพิเศษ
+                p.vy = -14.5;
                 p.jumpsLeft = 1;
             }
         });
@@ -453,8 +451,8 @@ class PlatformerGame {
                 if (Math.sqrt(dx * dx + dy * dy) < pw.radius + p.width / 2) {
                     pw.collected = true;
                     if (pw.type === 'shield') p.hasShield = true;
-                    if (pw.type === 'magnet') p.magnetTimer = 300; // 5 วินาที
-                    if (pw.type === 'boost') p.boostTimer = 300;  // 5 วินาที
+                    if (pw.type === 'magnet') p.magnetTimer = 300;
+                    if (pw.type === 'boost') p.boostTimer = 300;
                     store.addScore(25);
                 }
             }
@@ -497,7 +495,7 @@ class PlatformerGame {
             }
         });
 
-        // Goal Collision Detection (Pass Level & Calculate Star Rating)
+        // Goal Collision Detection
         if (
             this.goal &&
             !this.goal.isLocked &&
@@ -600,7 +598,7 @@ class PlatformerGame {
         // Render Sunny Sky
         this.drawSkyBackground();
 
-        // Render Goal (ประตูสีเขียว + แม่กุญแจ)
+        // Render Goal
         if (this.goal) {
             this.ctx.fillStyle = this.goal.isLocked ? '#64748b' : '#10b981';
             this.ctx.fillRect(this.goal.x, this.goal.y, this.goal.width, this.goal.height);
