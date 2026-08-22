@@ -262,6 +262,7 @@ class PlatformerGame {
     }
 
     resetEntities() {
+        this.resizeCanvas();
         const w = this.canvas.width || 360;
         const h = this.canvas.height || 400;
 
@@ -288,6 +289,7 @@ class PlatformerGame {
 
             // Active Power-ups State
             hasShield: true,
+            invincibleTimer: 0, // เวลาอมตะชั่วคราวหลังได้รับความเสียหาย
             magnetTimer: 0,
             boostTimer: 0,
 
@@ -421,15 +423,21 @@ class PlatformerGame {
 
         this.levelTime++;
 
+        // ตัวนับเวลาอมตะ
+        if (p.invincibleTimer > 0) p.invincibleTimer--;
+
         // อัปเดตลาวาไต่ระดับ
         if (this.lava) {
             this.lava.y -= this.lava.speed;
             if (p.y + p.height > this.lava.y) {
-                if (p.hasShield) {
-                    p.hasShield = false;
-                    p.vy = -12;
-                } else if (!p.isDashing) {
-                    store.setGameOver(true);
+                if (p.invincibleTimer <= 0) {
+                    if (p.hasShield) {
+                        p.hasShield = false;
+                        p.vy = -12;
+                        p.invincibleTimer = 45;
+                    } else if (!p.isDashing && !state.isGameOver) {
+                        store.setGameOver(true);
+                    }
                 }
             }
         }
@@ -493,7 +501,7 @@ class PlatformerGame {
         if (p.x < 0) p.x = 0;
         if (p.x + p.width > this.canvas.width) p.x = this.canvas.width - p.width;
 
-        // Platforms Mechanics (คำนวณแท่นแบบใหม่ทั้งหมด)
+        // Platforms Mechanics
         p.isGrounded = false;
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
@@ -539,7 +547,7 @@ class PlatformerGame {
                 // แท่นน้ำแข็งลื่น (Ice)
                 if (plat.type === 'ice') {
                     if (!this.keys.left && !this.keys.right) {
-                        p.vx *= 0.96; // แรงไถล
+                        p.vx *= 0.96;
                     }
                 }
 
@@ -573,11 +581,14 @@ class PlatformerGame {
                     enemy.isDefeated = true;
                     p.vy = -10.0;
                     store.addScore(50);
-                } else if (p.hasShield) {
-                    p.hasShield = false;
-                    p.vy = -6;
-                } else if (!p.isDashing) {
-                    store.setGameOver(true);
+                } else if (p.invincibleTimer <= 0) {
+                    if (p.hasShield) {
+                        p.hasShield = false;
+                        p.vy = -6;
+                        p.invincibleTimer = 45;
+                    } else if (!p.isDashing && !state.isGameOver) {
+                        store.setGameOver(true);
+                    }
                 }
             }
         });
@@ -651,11 +662,14 @@ class PlatformerGame {
                 p.y < spike.y + spike.height &&
                 p.y + p.height > spike.y
             ) {
-                if (p.hasShield) {
-                    p.hasShield = false;
-                    p.vy = -8;
-                } else if (!p.isDashing) {
-                    store.setGameOver(true);
+                if (p.invincibleTimer <= 0) {
+                    if (p.hasShield) {
+                        p.hasShield = false;
+                        p.vy = -8;
+                        p.invincibleTimer = 45;
+                    } else if (!p.isDashing && !state.isGameOver) {
+                        store.setGameOver(true);
+                    }
                 }
             }
         });
@@ -690,12 +704,15 @@ class PlatformerGame {
 
         // Check Fall Off Condition
         if (p.y > this.canvas.height + 40) {
-            if (p.hasShield) {
-                p.hasShield = false;
-                p.y = this.canvas.height - 120;
-                p.vy = -10;
-            } else {
-                store.setGameOver(true);
+            if (p.invincibleTimer <= 0) {
+                if (p.hasShield) {
+                    p.hasShield = false;
+                    p.y = this.canvas.height - 120;
+                    p.vy = -10;
+                    p.invincibleTimer = 45;
+                } else if (!state.isGameOver) {
+                    store.setGameOver(true);
+                }
             }
         }
 
@@ -826,10 +843,10 @@ class PlatformerGame {
             }
         }
 
-        // Render Platforms ตามประเภทแบบใหม่
+        // Render Platforms
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
-            if (plat.type === 'phase' && !plat.active) return; // ไม่แสดงผลเมื่อจังหวะดับ
+            if (plat.type === 'phase' && !plat.active) return;
 
             let bodyColor = '#334155';
             let topColor = '#22c55e';
@@ -928,38 +945,43 @@ class PlatformerGame {
 
         // Render Animated Player Image
         if (this.playerImg.complete && this.playerImg.naturalWidth !== 0) {
-            this.ctx.save();
-            const centerX = p.x + p.width / 2;
-            const centerY = p.y + p.height / 2;
-            this.ctx.translate(centerX, centerY);
+            // กระพริบตัวละครเมื่ออยู่ในสถานะอมตะ
+            if (p.invincibleTimer > 0 && Math.floor(p.invincibleTimer / 4) % 2 === 0) {
+                // เว้นการเรนเดอร์ชั่วขณะเพื่อให้เกิดเอฟเฟกต์กระพริบ
+            } else {
+                this.ctx.save();
+                const centerX = p.x + p.width / 2;
+                const centerY = p.y + p.height / 2;
+                this.ctx.translate(centerX, centerY);
 
-            if (p.facing === 'left') {
-                this.ctx.scale(-1, 1);
+                if (p.facing === 'left') {
+                    this.ctx.scale(-1, 1);
+                }
+
+                this.ctx.rotate(p.rotation);
+                this.ctx.scale(p.scaleX, p.scaleY);
+
+                // Shield Aura
+                if (p.hasShield) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, p.width / 1.8, 0, Math.PI * 2);
+                    this.ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#38bdf8';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                }
+
+                this.ctx.drawImage(
+                    this.playerImg,
+                    -p.width / 2,
+                    -p.height / 2,
+                    p.width,
+                    p.height
+                );
+
+                this.ctx.restore();
             }
-
-            this.ctx.rotate(p.rotation);
-            this.ctx.scale(p.scaleX, p.scaleY);
-
-            // Shield Aura
-            if (p.hasShield) {
-                this.ctx.beginPath();
-                this.ctx.arc(0, 0, p.width / 1.8, 0, Math.PI * 2);
-                this.ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
-                this.ctx.fill();
-                this.ctx.strokeStyle = '#38bdf8';
-                this.ctx.lineWidth = 2;
-                this.ctx.stroke();
-            }
-
-            this.ctx.drawImage(
-                this.playerImg,
-                -p.width / 2,
-                -p.height / 2,
-                p.width,
-                p.height
-            );
-
-            this.ctx.restore();
         }
 
         // Render HUD Info
