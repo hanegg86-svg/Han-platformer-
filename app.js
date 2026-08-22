@@ -10,6 +10,10 @@ class PlatformerGame {
         this.keys = { left: false, right: false, jump: false };
         this.animationFrameId = null;
 
+        // Background Music Setup
+        this.bgm = new Audio('bgm.mp3');
+        this.bgm.loop = true;
+
         // Physics Constants
         this.GRAVITY = 0.45;
         
@@ -36,8 +40,33 @@ class PlatformerGame {
         this.setupTouchControls();
         this.setupKeyboardControls();
 
+        // Unlock Audio Autoplay on First Interaction
+        const unlockAudio = () => {
+            this.updateBGMState();
+            window.removeEventListener('touchstart', unlockAudio);
+            window.removeEventListener('mousedown', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+        };
+        window.addEventListener('touchstart', unlockAudio);
+        window.addEventListener('mousedown', unlockAudio);
+        window.addEventListener('keydown', unlockAudio);
+
+        // React to sound settings / tab / game over state changes
+        store.subscribe(() => this.updateBGMState());
+
         this.resetEntities();
         this.gameLoop();
+    }
+
+    updateBGMState() {
+        const state = store.getState();
+        if (state.soundEnabled && state.activeTab === 'game' && !state.isGameOver) {
+            if (this.bgm.paused) {
+                this.bgm.play().catch(() => {});
+            }
+        } else {
+            this.bgm.pause();
+        }
     }
 
     resizeCanvas() {
@@ -190,11 +219,14 @@ class PlatformerGame {
             this.keys.right = false;
             this.keys.jump = false;
         }
+        this.updateBGMState();
     }
 
     restartGame() {
         store.resetScore();
         this.resetEntities();
+        this.bgm.currentTime = 0;
+        this.updateBGMState();
     }
 
     update() {
