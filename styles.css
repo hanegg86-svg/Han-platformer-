@@ -31,6 +31,7 @@ body {
 /* Header */
 .app-header {
     height: 60px;
+    flex-shrink: 0;
     background-color: #0f172a;
     display: flex;
     align-items: center;
@@ -59,6 +60,7 @@ body {
 /* Main Content Area */
 .app-content {
     flex: 1;
+    min-height: 0;
     position: relative;
     overflow: hidden;
 }
@@ -86,6 +88,7 @@ body {
 
 .canvas-container {
     flex: 1;
+    min-height: 0;
     position: relative;
     width: 100%;
     background-color: #0284c7;
@@ -142,6 +145,7 @@ canvas {
 /* Mobile Touch Controls */
 .touch-controls {
     height: 155px;
+    flex-shrink: 0;
     background-color: #0f172a;
     display: flex;
     justify-content: space-between;
@@ -380,9 +384,11 @@ canvas {
 /* Bottom Navigation */
 .bottom-nav {
     height: 68px;
+    flex-shrink: 0;
     background-color: #0f172a;
     display: flex;
     border-top: 1px solid #334155;
+    z-index: 5;
 }
 
 .nav-btn {
@@ -420,7 +426,7 @@ canvas {
     }
 
     .app-header {
-        height: 64px;
+        height: 60px;
         padding: 0 28px;
     }
 
@@ -434,61 +440,61 @@ canvas {
     }
 
     .touch-controls {
-        height: 170px;
-        padding: 16px 40px;
+        height: 155px;
+        padding: 14px 28px;
     }
 
     .dpad, .action-btns {
-        gap: 20px;
+        gap: 16px;
     }
 
     .touch-btn {
-        width: 84px;
-        height: 84px;
-        font-size: 1.6rem;
+        width: 76px;
+        height: 76px;
+        font-size: 1.5rem;
     }
 
     .btn-action {
-        width: 120px;
-        height: 84px;
-        font-size: 1.25rem;
-    }
-
-    .btn-dash {
-        width: 110px;
-        height: 84px;
+        width: 104px;
+        height: 76px;
         font-size: 1.15rem;
     }
 
+    .btn-dash {
+        width: 96px;
+        height: 76px;
+        font-size: 1.05rem;
+    }
+
     .bottom-nav {
-        height: 72px;
+        height: 68px;
     }
 
     .nav-icon {
-        font-size: 1.6rem;
+        font-size: 1.5rem;
     }
 
     .nav-label {
-        font-size: 0.85rem;
+        font-size: 0.82rem;
     }
 
     .tab-view {
-        padding: 32px;
+        padding: 24px;
     }
 
     .card {
-        padding: 28px;
-        margin-bottom: 24px;
+        padding: 24px;
+        margin-bottom: 20px;
         max-width: 620px;
     }
 
     .card h2 {
-        font-size: 1.45rem;
+        font-size: 1.4rem;
     }
 
     .stat-row {
-        font-size: 1.15rem;
-        padding: 16px 0;
+        font-size: 1.1rem;
+        padding: 14px 0;
     }
 
     .shop-item-action {
