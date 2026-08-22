@@ -112,6 +112,10 @@ class PlatformerGame {
         this.playerImg = new Image();
         this.playerImg.src = 'player.png';
 
+        // Enemy Single Image Setup (Metal Leafy)
+        this.enemyImg = new Image();
+        this.enemyImg.src = 'enemy.png';
+
         // Physics Constants
         this.GRAVITY = 0.38;
         
@@ -328,12 +332,12 @@ class PlatformerGame {
             const isRanged = (level >= 12 && level % 3 === 0);
             enemies.push({
                 x: topPlat.x + 5,
-                y: topPlat.y - 20,
-                width: 24,
-                height: 20,
+                y: topPlat.y - 28,
+                width: 32,
+                height: 32,
                 vx: isRanged ? 0 : (1.0 + level * 0.025),
                 minX: topPlat.x,
-                maxX: topPlat.x + topPlat.width - 24,
+                maxX: topPlat.x + topPlat.width - 32,
                 isDefeated: false,
                 isRanged: isRanged,
                 shootTimer: 0
@@ -344,12 +348,12 @@ class PlatformerGame {
             const midPlat = platforms[Math.floor(platforms.length / 2)];
             enemies.push({
                 x: midPlat.x + 5,
-                y: midPlat.y - 20,
-                width: 24,
-                height: 20,
+                y: midPlat.y - 28,
+                width: 32,
+                height: 32,
                 vx: 1.2 + (level * 0.02),
                 minX: midPlat.x,
-                maxX: midPlat.x + midPlat.width - 24,
+                maxX: midPlat.x + midPlat.width - 32,
                 isDefeated: false,
                 isRanged: false
             });
@@ -446,8 +450,8 @@ class PlatformerGame {
         this.player = {
             x: this.spawnPoint.x,
             y: this.spawnPoint.y,
-            width: 36,
-            height: 36,
+            width: 36,  // กล่องการชน (Physics Hitbox) คงเดิมเพื่อไม่ให้ชนชั้นบน
+            height: 36, // กล่องการชน (Physics Hitbox) คงเดิมเพื่อไม่ให้ชนชั้นบน
             vx: 0,
             vy: 0,
             speed: 4.8,
@@ -824,7 +828,6 @@ class PlatformerGame {
                 }
             }
 
-            // 👈 แก้ไข: เช็กระดับเท้าตัวละคร ไม่ให้ชนศัตรูถ้าตัวละครยังอยู่ใต้แท่น
             const isPlayerBelowPlatform = (p.y + p.height) > (enemy.y + enemy.height + 4);
             if (
                 !isPlayerBelowPlatform &&
@@ -878,7 +881,6 @@ class PlatformerGame {
 
         // Key Collection
         if (this.keyItem && !this.keyItem.collected) {
-            // 👈 แก้ไข: เช็กระดับเท้าตัวละคร ไม่ให้เก็บกุญแจได้จากการกระโดดชนจากใต้แท่น
             if (
                 (p.y + p.height) <= (this.keyItem.y + this.keyItem.height + 8) &&
                 p.x < this.keyItem.x + this.keyItem.width &&
@@ -948,7 +950,6 @@ class PlatformerGame {
         });
 
         // Goal Collision
-        // 👈 แก้ไข: เช็กระดับเท้าตัวละคร ไม่ให้เข้าประตูได้ถ้าตัวละครยังอยู่ใต้แท่น
         if (
             this.goal &&
             !this.goal.isLocked &&
@@ -1302,35 +1303,91 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // Render Enemies with Squishy Animation & Glowing Eyes
+        // Render Enemies (Metal Leafy with Knife)
         this.enemies.forEach(e => {
             if (e.isDefeated) return;
             this.ctx.save();
 
-            const pulse = Math.sin(this.levelTime * 0.15) * 2;
-            const enemyColor = e.isRanged ? '#eab308' : (this.currentTheme === 'volcano' ? '#ef4444' : '#a855f7');
+            const centerX = e.x + e.width / 2;
+            const centerY = e.y + e.height / 2;
+            this.ctx.translate(centerX, centerY);
 
-            this.ctx.shadowBlur = 8;
-            this.ctx.shadowColor = enemyColor;
+            if (e.vx < 0) {
+                this.ctx.scale(-1, 1);
+            }
 
-            this.ctx.fillStyle = enemyColor;
-            this.ctx.beginPath();
-            this.ctx.arc(e.x + e.width / 2, e.y + e.height / 2 - pulse / 2, e.width / 2, Math.PI, 0, false);
-            this.ctx.fillRect(e.x, e.y + e.height / 2 - pulse / 2, e.width, e.height / 2 + pulse / 2);
-            this.ctx.fill();
+            if (this.enemyImg.complete && this.enemyImg.naturalWidth !== 0) {
+                this.ctx.drawImage(this.enemyImg, -e.width / 2, -e.height / 2, e.width, e.height);
+            } else {
+                // Vector Metal Leafy Draw
+                const w = e.width;
+                const h = e.height;
 
-            const eyeOffset = e.vx > 0 ? 2 : -2;
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.beginPath();
-            this.ctx.arc(e.x + 8 + eyeOffset, e.y + 8 - pulse / 2, 4, 0, Math.PI * 2);
-            this.ctx.arc(e.x + e.width - 8 + eyeOffset, e.y + 8 - pulse / 2, 4, 0, Math.PI * 2);
-            this.ctx.fill();
+                // Leaf Body (Metal Gray Gradient)
+                const leafGrad = this.ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+                leafGrad.addColorStop(0, '#9ca3af');
+                leafGrad.addColorStop(0.5, '#6b7280');
+                leafGrad.addColorStop(1, '#4b5563');
 
-            this.ctx.fillStyle = '#0f172a';
-            this.ctx.beginPath();
-            this.ctx.arc(e.x + 8 + eyeOffset * 1.5, e.y + 8 - pulse / 2, 2, 0, Math.PI * 2);
-            this.ctx.arc(e.x + e.width - 8 + eyeOffset * 1.5, e.y + 8 - pulse / 2, 2, 0, Math.PI * 2);
-            this.ctx.fill();
+                this.ctx.fillStyle = leafGrad;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, -h / 2);
+                this.ctx.quadraticCurveTo(w / 1.8, -h / 6, w / 2.2, h / 3);
+                this.ctx.quadraticCurveTo(0, h / 1.8, 0, h / 2);
+                this.ctx.quadraticCurveTo(0, h / 1.8, -w / 2.2, h / 3);
+                this.ctx.quadraticCurveTo(-w / 1.8, -h / 6, 0, -h / 2);
+                this.ctx.closePath();
+                this.ctx.fill();
+
+                // Leaf Center Seam Line
+                this.ctx.strokeStyle = '#374151';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, -h / 2 + 2);
+                this.ctx.lineTo(0, h / 2 - 2);
+                this.ctx.stroke();
+
+                // Eyes (Sinister Slits)
+                this.ctx.fillStyle = '#000000';
+                this.ctx.beginPath();
+                this.ctx.ellipse(-w / 5, -h / 8, 2, 4, -0.2, 0, Math.PI * 2);
+                this.ctx.ellipse(w / 5, -h / 8, 2, 4, 0.2, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Sinister Smile
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 1.5;
+                this.ctx.beginPath();
+                this.ctx.arc(0, h / 10, w / 3.5, 0.1 * Math.PI, 0.9 * Math.PI, false);
+                this.ctx.closePath();
+                this.ctx.fill();
+                this.ctx.stroke();
+
+                // Black Arm & Knife
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 2.5;
+                this.ctx.beginPath();
+                this.ctx.moveTo(w / 3, 0);
+                this.ctx.lineTo(w / 1.4, -h / 6);
+                this.ctx.stroke();
+
+                // Knife Handle
+                this.ctx.fillStyle = '#78350f';
+                this.ctx.fillRect(w / 1.4 - 2, -h / 6 - 8, 4, 8);
+
+                // Knife Blade
+                this.ctx.fillStyle = '#e5e7eb';
+                this.ctx.strokeStyle = '#9ca3af';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(w / 1.4, -h / 6 - 8);
+                this.ctx.lineTo(w / 1.4 - 4, -h / 6 - 22);
+                this.ctx.quadraticCurveTo(w / 1.4 + 6, -h / 6 - 16, w / 1.4 + 2, -h / 6 - 8);
+                this.ctx.closePath();
+                this.ctx.fill();
+                this.ctx.stroke();
+            }
 
             this.ctx.restore();
         });
@@ -1461,9 +1518,13 @@ class PlatformerGame {
                 this.ctx.rotate(p.rotation);
                 this.ctx.scale(p.scaleX, p.scaleY);
 
+                // 👈 ขยายขนาดภาพวาดขึ้น 35% โดยยึดตำแหน่งเท้าเดิม (Hitbox 36x36 เท่าเดิม)
+                const renderW = p.width * 1.35;
+                const renderH = p.height * 1.35;
+
                 if (p.hasShield) {
                     this.ctx.beginPath();
-                    this.ctx.arc(0, -p.height / 2, p.width / 1.4, 0, Math.PI * 2);
+                    this.ctx.arc(0, -renderH / 2, renderW / 1.3, 0, Math.PI * 2);
                     this.ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
                     this.ctx.fill();
                     this.ctx.strokeStyle = '#38bdf8';
@@ -1473,10 +1534,10 @@ class PlatformerGame {
 
                 this.ctx.drawImage(
                     this.playerImg,
-                    -p.width / 2,
-                    -p.height,
-                    p.width,
-                    p.height
+                    -renderW / 2,
+                    -renderH,
+                    renderW,
+                    renderH
                 );
 
                 this.ctx.restore();
