@@ -57,7 +57,6 @@ class Store {
 
     resetScore() {
         this.state.score = 0;
-        this.state.level = 1;
         this.state.isGameOver = false;
         this.notify();
     }

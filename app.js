@@ -7,10 +7,10 @@ class PlatformerGame {
         this.ctx = this.canvas.getContext('2d');
         this.ui = new UIManager();
         
-        this.keys = { left: false, right: false, jump: false };
+        this.keys = { left: false, right: false, jump: false, dash: false };
         this.animationFrameId = null;
 
-        // Background Music Setup
+        // Sound Setup
         this.bgm = new Audio('bgm.mp3');
         this.bgm.loop = true;
 
@@ -21,12 +21,17 @@ class PlatformerGame {
         // Physics Constants
         this.GRAVITY = 0.45;
         
-        // Game Entities & Banner State
+        // Game Entities
         this.player = null;
         this.platforms = [];
         this.coins = [];
         this.spikes = [];
+        this.springs = [];
+        this.powerups = [];
+        this.keyItem = null;
         this.goal = null;
+
+        // Level Completion Banner & Stars State
         this.bannerTimer = 0;
         this.bannerText = '';
 
@@ -57,7 +62,6 @@ class PlatformerGame {
         window.addEventListener('mousedown', unlockAudio);
         window.addEventListener('keydown', unlockAudio);
 
-        // React to sound settings / tab / game over state changes
         store.subscribe(() => this.updateBGMState());
 
         this.resetEntities();
@@ -83,62 +87,79 @@ class PlatformerGame {
 
     getLevelData(level, w, h) {
         const levels = [
-            // ด่าน 1: เริ่มต้น เรียนรู้ระบบกระโดดไปยังเป้าหมาย
+            // ด่าน 1: สอนกุญแจ ล็อคประตู สปริง และแม่เหล็ก
             {
                 platforms: [
-                    { x: 0, y: h - 20, width: w, height: 20 },
-                    { x: 40, y: h - 90, width: 100, height: 14 },
-                    { x: 180, y: h - 160, width: 100, height: 14 },
-                    { x: 60, y: h - 230, width: 100, height: 14 },
-                    { x: 210, y: h - 300, width: 110, height: 14 }
+                    { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
+                    { x: 20, y: h - 80, width: 90, height: 14, type: 'normal' },
+                    { x: 150, y: h - 150, width: 90, height: 14, type: 'moving', vx: 1.5, minX: 130, maxX: w - 100 },
+                    { x: 40, y: h - 230, width: 90, height: 14, type: 'normal' },
+                    { x: 200, y: h - 310, width: 110, height: 14, type: 'normal' }
                 ],
                 coins: [
-                    { x: 80, y: h - 120, radius: 8, collected: false },
-                    { x: 220, y: h - 190, radius: 8, collected: false },
-                    { x: 100, y: h - 260, radius: 8, collected: false }
+                    { x: 70, y: h - 110, radius: 8, collected: false },
+                    { x: 200, y: h - 180, radius: 8, collected: false },
+                    { x: 80, y: h - 260, radius: 8, collected: false }
                 ],
                 spikes: [],
-                goal: { x: 250, y: h - 340, width: 30, height: 40 }
+                springs: [
+                    { x: 95, y: h - 30, width: 24, height: 10 }
+                ],
+                powerups: [
+                    { x: 50, y: h - 260, type: 'magnet', collected: false, radius: 10 }
+                ],
+                keyItem: { x: 50, y: h - 110, width: 20, height: 20, collected: false },
+                goal: { x: 250, y: h - 350, width: 30, height: 40, isLocked: true }
             },
-            // ด่าน 2: เพิ่มอุปสรรคหนามบนพื้นและบนแท่น
+            // ด่าน 2: แท่นพัง โล่ป้องกัน และพุ่งตัว Dash
             {
                 platforms: [
-                    { x: 0, y: h - 20, width: w, height: 20 },
-                    { x: 30, y: h - 80, width: 80, height: 14 },
-                    { x: 160, y: h - 140, width: 80, height: 14 },
-                    { x: 260, y: h - 210, width: 80, height: 14 },
-                    { x: 120, y: h - 280, width: 100, height: 14 },
-                    { x: 10, y: h - 330, width: 80, height: 14 }
+                    { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
+                    { x: 20, y: h - 80, width: 80, height: 14, type: 'normal' },
+                    { x: 140, y: h - 140, width: 70, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
+                    { x: 250, y: h - 210, width: 80, height: 14, type: 'normal' },
+                    { x: 120, y: h - 280, width: 90, height: 14, type: 'normal' },
+                    { x: 10, y: h - 340, width: 80, height: 14, type: 'normal' }
                 ],
                 coins: [
-                    { x: 200, y: h - 170, radius: 8, collected: false },
-                    { x: 170, y: h - 310, radius: 8, collected: false }
+                    { x: 170, y: h - 170, radius: 8, collected: false },
+                    { x: 150, y: h - 310, radius: 8, collected: false }
                 ],
                 spikes: [
-                    { x: 170, y: h - 154, width: 30, height: 14 },
-                    { x: 120, y: h - 34, width: 100, height: 14 }
+                    { x: 130, y: h - 34, width: 100, height: 14 }
                 ],
-                goal: { x: 35, y: h - 370, width: 30, height: 40 }
+                springs: [
+                    { x: 280, y: h - 220, width: 24, height: 10 }
+                ],
+                powerups: [
+                    { x: 40, y: h - 110, type: 'shield', collected: false, radius: 10 }
+                ],
+                keyItem: { x: 280, y: h - 240, width: 20, height: 20, collected: false },
+                goal: { x: 30, y: h - 380, width: 30, height: 40, isLocked: true }
             },
-            // ด่าน 3: เพิ่มความยากของการกระโดดและกับดักหนามขนาดใหญ่
+            // ด่าน 3: ไต่กำแพง Wall Jump แท่นเลื่อน และพาวเวอร์อัพสปีดไฟ
             {
                 platforms: [
-                    { x: 0, y: h - 20, width: w, height: 20 },
-                    { x: 50, y: h - 100, width: 70, height: 14 },
-                    { x: 180, y: h - 180, width: 70, height: 14 },
-                    { x: 50, y: h - 260, width: 70, height: 14 },
-                    { x: 180, y: h - 340, width: 100, height: 14 }
+                    { x: 0, y: h - 20, width: w, height: 20, type: 'normal' },
+                    { x: 20, y: h - 80, width: 80, height: 14, type: 'normal' },
+                    { x: 180, y: h - 160, width: 80, height: 14, type: 'moving', vx: -1.8, minX: 140, maxX: w - 90 },
+                    { x: 40, y: h - 240, width: 70, height: 14, type: 'crumble', timer: 0, isCrumbling: false, isDestroyed: false },
+                    { x: 180, y: h - 320, width: 110, height: 14, type: 'normal' }
                 ],
                 coins: [
-                    { x: 80, y: h - 130, radius: 8, collected: false },
-                    { x: 210, y: h - 210, radius: 8, collected: false },
-                    { x: 80, y: h - 290, radius: 8, collected: false }
+                    { x: 210, y: h - 190, radius: 8, collected: false },
+                    { x: 70, y: h - 270, radius: 8, collected: false }
                 ],
                 spikes: [
-                    { x: 50, y: h - 34, width: Math.max(50, w - 100), height: 14 },
-                    { x: 200, y: h - 194, width: 30, height: 14 }
+                    { x: 130, y: h - 34, width: Math.max(50, w - 160), height: 14 },
+                    { x: 200, y: h - 174, width: 30, height: 14 }
                 ],
-                goal: { x: 220, y: h - 380, width: 30, height: 40 }
+                springs: [],
+                powerups: [
+                    { x: 50, y: h - 110, type: 'boost', collected: false, radius: 10 }
+                ],
+                keyItem: { x: 220, y: h - 190, width: 20, height: 20, collected: false },
+                goal: { x: 220, y: h - 360, width: 30, height: 40, isLocked: true }
             }
         ];
 
@@ -149,6 +170,9 @@ class PlatformerGame {
             platforms: selected.platforms.map(p => ({ ...p })),
             coins: selected.coins.map(c => ({ ...c })),
             spikes: selected.spikes.map(s => ({ ...s })),
+            springs: selected.springs.map(sp => ({ ...sp })),
+            powerups: selected.powerups.map(pw => ({ ...pw })),
+            keyItem: selected.keyItem ? { ...selected.keyItem } : null,
             goal: { ...selected.goal }
         };
     }
@@ -158,10 +182,10 @@ class PlatformerGame {
         const h = this.canvas.height || 400;
 
         this.player = {
-            x: 30,
-            y: h - 100,
-            width: 48,
-            height: 48,
+            x: 25,
+            y: h - 140,
+            width: 60,
+            height: 60,
             vx: 0,
             vy: 0,
             speed: 4.2,
@@ -169,6 +193,18 @@ class PlatformerGame {
             isGrounded: false,
             color: '#ef4444',
             
+            // Player Mechanics
+            jumpsLeft: 2,
+            isDashing: false,
+            dashTimer: 0,
+            dashCooldown: 0,
+            isWallSliding: false,
+
+            // Active Power-ups State
+            hasShield: false,
+            magnetTimer: 0,
+            boostTimer: 0,
+
             // Procedural Animation States
             facing: 'right',
             walkTimer: 0,
@@ -184,12 +220,16 @@ class PlatformerGame {
         this.platforms = levelData.platforms;
         this.coins = levelData.coins;
         this.spikes = levelData.spikes;
+        this.springs = levelData.springs;
+        this.powerups = levelData.powerups;
+        this.keyItem = levelData.keyItem;
         this.goal = levelData.goal;
     }
 
     setupTouchControls() {
         const bindBtn = (id, key) => {
             const btn = document.getElementById(id);
+            if (!btn) return;
             const start = (e) => {
                 e.preventDefault();
                 this.keys[key] = true;
@@ -211,13 +251,18 @@ class PlatformerGame {
         bindBtn('btn-left', 'left');
         bindBtn('btn-right', 'right');
         bindBtn('btn-jump', 'jump');
+        bindBtn('btn-dash', 'dash');
     }
 
     setupKeyboardControls() {
         window.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft' || e.key === 'a') this.keys.left = true;
             if (e.key === 'ArrowRight' || e.key === 'd') this.keys.right = true;
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') this.keys.jump = true;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') {
+                if (!this.keys.jump) this.handleJumpTrigger();
+                this.keys.jump = true;
+            }
+            if (e.key === 'Shift' || e.key === 'k') this.handleDashTrigger();
         });
 
         window.addEventListener('keyup', (e) => {
@@ -227,11 +272,38 @@ class PlatformerGame {
         });
     }
 
+    handleJumpTrigger() {
+        const p = this.player;
+        if (p.isGrounded) {
+            p.vy = p.jumpPower;
+            p.isGrounded = false;
+            p.jumpsLeft = 1; // ใช้ไป 1 ครั้ง เหลือดับเบิลจัมพ์
+        } else if (p.isWallSliding) {
+            p.vy = p.jumpPower;
+            p.vx = p.facing === 'left' ? p.speed : -p.speed;
+            p.isWallSliding = false;
+        } else if (p.jumpsLeft > 0) {
+            // Double Jump
+            p.vy = p.jumpPower * 0.9;
+            p.jumpsLeft--;
+        }
+    }
+
+    handleDashTrigger() {
+        const p = this.player;
+        if (p.dashCooldown <= 0 && !p.isDashing) {
+            p.isDashing = true;
+            p.dashTimer = 10;
+            p.dashCooldown = 60; // คูลดาวน์ 1 วินาที
+        }
+    }
+
     handleTabChange(tab) {
         if (tab !== 'game') {
             this.keys.left = false;
             this.keys.right = false;
             this.keys.jump = false;
+            this.keys.dash = false;
         }
         this.updateBGMState();
     }
@@ -249,29 +321,219 @@ class PlatformerGame {
 
         const p = this.player;
 
-        // Horizontal Movement & Facing Direction
-        if (this.keys.left) {
-            p.vx = -p.speed;
-            p.facing = 'left';
-        } else if (this.keys.right) {
-            p.vx = p.speed;
-            p.facing = 'right';
+        // Check Touch Dash Key Trigger
+        if (this.keys.dash) {
+            this.handleDashTrigger();
+            this.keys.dash = false;
+        }
+
+        // Active Power-up Timers & Boosts
+        if (p.boostTimer > 0) p.boostTimer--;
+        if (p.magnetTimer > 0) p.magnetTimer--;
+
+        const currentSpeed = p.boostTimer > 0 ? p.speed * 1.5 : p.speed;
+
+        // Dash Mechanics Logic
+        if (p.isDashing) {
+            p.vx = p.facing === 'right' ? currentSpeed * 2.8 : -currentSpeed * 2.8;
+            p.vy = 0;
+            p.dashTimer--;
+            if (p.dashTimer <= 0) p.isDashing = false;
         } else {
-            p.vx = 0;
+            // Horizontal Movement & Facing Direction
+            if (this.keys.left) {
+                p.vx = -currentSpeed;
+                p.facing = 'left';
+            } else if (this.keys.right) {
+                p.vx = currentSpeed;
+                p.facing = 'right';
+            } else {
+                p.vx = 0;
+            }
+
+            // Apply Gravity
+            p.vy += this.GRAVITY;
         }
 
-        // Jump Mechanics
-        if (this.keys.jump && p.isGrounded) {
-            p.vy = p.jumpPower;
-            p.isGrounded = false;
-        }
-
-        // Apply Gravity
-        p.vy += this.GRAVITY;
+        if (p.dashCooldown > 0) p.dashCooldown--;
 
         // Position Updates
         p.x += p.vx;
         p.y += p.vy;
+
+        // Wall Sliding Logic
+        p.isWallSliding = false;
+        if (!p.isGrounded && p.vy > 0) {
+            if (p.x <= 0 && this.keys.left) {
+                p.isWallSliding = true;
+                p.vy = 1.5;
+            } else if (p.x + p.width >= this.canvas.width && this.keys.right) {
+                p.isWallSliding = true;
+                p.vy = 1.5;
+            }
+        }
+
+        // Screen Boundary Constraints
+        if (p.x < 0) p.x = 0;
+        if (p.x + p.width > this.canvas.width) p.x = this.canvas.width - p.width;
+
+        // Platforms Mechanics (Normal, Moving, Crumbling)
+        p.isGrounded = false;
+        this.platforms.forEach(plat => {
+            if (plat.isDestroyed) return;
+
+            // Moving Platform Updates
+            if (plat.type === 'moving') {
+                plat.x += plat.vx;
+                if (plat.x <= plat.minX || plat.x + plat.width >= plat.maxX) {
+                    plat.vx *= -1;
+                }
+            }
+
+            // Collision Detection
+            if (
+                p.x < plat.x + plat.width &&
+                p.x + p.width > plat.x &&
+                p.y + p.height >= plat.y &&
+                p.y + p.height <= plat.y + plat.height + p.vy &&
+                p.vy >= 0
+            ) {
+                p.isGrounded = true;
+                p.jumpsLeft = 2; // Reset Double Jump
+                p.vy = 0;
+                p.y = plat.y - p.height;
+
+                // Move Player with Moving Platform
+                if (plat.type === 'moving') {
+                    p.x += plat.vx;
+                }
+
+                // Crumbling Platform Trigger
+                if (plat.type === 'crumble') {
+                    plat.isCrumbling = true;
+                }
+            }
+
+            // Update Crumble Timers
+            if (plat.isCrumbling) {
+                plat.timer++;
+                if (plat.timer > 30) {
+                    plat.isDestroyed = true;
+                }
+            }
+        });
+
+        // Spring Mechanics
+        this.springs.forEach(sp => {
+            if (
+                p.x < sp.x + sp.width &&
+                p.x + p.width > sp.x &&
+                p.y + p.height >= sp.y &&
+                p.y + p.height <= sp.y + sp.height + p.vy
+            ) {
+                p.vy = -14.5; // ดีดตัวขึ้นสูงพิเศษ
+                p.jumpsLeft = 1;
+            }
+        });
+
+        // Key Collection Detection
+        if (this.keyItem && !this.keyItem.collected) {
+            if (
+                p.x < this.keyItem.x + this.keyItem.width &&
+                p.x + p.width > this.keyItem.x &&
+                p.y < this.keyItem.y + this.keyItem.height &&
+                p.y + p.height > this.keyItem.y
+            ) {
+                this.keyItem.collected = true;
+                if (this.goal) this.goal.isLocked = false;
+                store.addScore(30);
+            }
+        }
+
+        // Power-ups Collection Detection
+        this.powerups.forEach(pw => {
+            if (!pw.collected) {
+                const dx = (p.x + p.width / 2) - pw.x;
+                const dy = (p.y + p.height / 2) - pw.y;
+                if (Math.sqrt(dx * dx + dy * dy) < pw.radius + p.width / 2) {
+                    pw.collected = true;
+                    if (pw.type === 'shield') p.hasShield = true;
+                    if (pw.type === 'magnet') p.magnetTimer = 300; // 5 วินาที
+                    if (pw.type === 'boost') p.boostTimer = 300;  // 5 วินาที
+                    store.addScore(25);
+                }
+            }
+        });
+
+        // Coins Collection & Magnet Effect
+        this.coins.forEach(coin => {
+            if (!coin.collected) {
+                const dx = (p.x + p.width / 2) - coin.x;
+                const dy = (p.y + p.height / 2) - coin.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Magnet Attraction Logic
+                if (p.magnetTimer > 0 && dist < 120) {
+                    coin.x += (dx / dist) * -3.5;
+                    coin.y += (dy / dist) * -3.5;
+                }
+
+                if (dist < coin.radius + p.width / 2) {
+                    coin.collected = true;
+                    store.addScore(10);
+                }
+            }
+        });
+
+        // Spike Obstacle Collision Detection
+        this.spikes.forEach(spike => {
+            if (
+                p.x < spike.x + spike.width &&
+                p.x + p.width > spike.x &&
+                p.y < spike.y + spike.height &&
+                p.y + p.height > spike.y
+            ) {
+                if (p.hasShield) {
+                    p.hasShield = false; // โล่แตกช่วยชีวิต 1 ครั้ง
+                    p.vy = -8;
+                } else if (!p.isDashing) {
+                    store.setGameOver(true);
+                }
+            }
+        });
+
+        // Goal Collision Detection (Pass Level & Calculate Star Rating)
+        if (
+            this.goal &&
+            !this.goal.isLocked &&
+            p.x < this.goal.x + this.goal.width &&
+            p.x + p.width > this.goal.x &&
+            p.y < this.goal.y + this.goal.height &&
+            p.y + p.height > this.goal.y
+        ) {
+            const coinsCollected = this.coins.filter(c => c.collected).length;
+            const totalCoins = this.coins.length;
+            let stars = '⭐';
+            if (coinsCollected === totalCoins) stars = '⭐⭐⭐';
+            else if (coinsCollected > 0) stars = '⭐⭐';
+
+            store.addScore(100);
+            store.nextLevel();
+            this.bannerText = `ปลดล็อกด่าน ${store.getState().level}! ${stars}`;
+            this.bannerTimer = 90;
+            this.resetEntities();
+        }
+
+        // Check Fall Off Condition
+        if (p.y > this.canvas.height + 40) {
+            if (p.hasShield) {
+                p.hasShield = false;
+                p.y = this.canvas.height - 120;
+                p.vy = -10;
+            } else {
+                store.setGameOver(true);
+            }
+        }
 
         // Procedural Animation Logic
         if (!p.isGrounded) {
@@ -290,87 +552,13 @@ class PlatformerGame {
             p.scaleY = 1 - Math.sin(p.idleTimer) * 0.04;
         }
 
-        // Screen Boundary Constraints
-        if (p.x < 0) p.x = 0;
-        if (p.x + p.width > this.canvas.width) p.x = this.canvas.width - p.width;
-
-        // Platform Collision Detection
-        p.isGrounded = false;
-        this.platforms.forEach(plat => {
-            if (
-                p.x < plat.x + plat.width &&
-                p.x + p.width > plat.x &&
-                p.y + p.height >= plat.y &&
-                p.y + p.height <= plat.y + plat.height + p.vy &&
-                p.vy >= 0
-            ) {
-                p.isGrounded = true;
-                p.vy = 0;
-                p.y = plat.y - p.height;
-            }
-        });
-
-        // Coin Collection Detection
-        this.coins.forEach(coin => {
-            if (!coin.collected) {
-                const dx = (p.x + p.width / 2) - coin.x;
-                const dy = (p.y + p.height / 2) - coin.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < coin.radius + p.width / 2) {
-                    coin.collected = true;
-                    store.addScore(10);
-                }
-            }
-        });
-
-        // Spike Obstacle Collision Detection (Game Over)
-        this.spikes.forEach(spike => {
-            if (
-                p.x < spike.x + spike.width &&
-                p.x + p.width > spike.x &&
-                p.y < spike.y + spike.height &&
-                p.y + p.height > spike.y
-            ) {
-                store.setGameOver(true);
-            }
-        });
-
-        // Goal Collision Detection (Pass Level)
-        if (
-            this.goal &&
-            p.x < this.goal.x + this.goal.width &&
-            p.x + p.width > this.goal.x &&
-            p.y < this.goal.y + this.goal.height &&
-            p.y + p.height > this.goal.y
-        ) {
-            store.addScore(100);
-            store.nextLevel();
-            this.bannerText = `ปลดล็อกด่าน ${store.getState().level}!`;
-            this.bannerTimer = 90;
-            this.resetEntities();
-        }
-
-        // Check Fall Off Condition (Game Over)
-        if (p.y > this.canvas.height + 40) {
-            store.setGameOver(true);
-        }
-
-        // Auto Respawn Coins & Bonus Score
-        if (this.coins.length > 0 && this.coins.every(c => c.collected)) {
-            this.coins.forEach(c => c.collected = false);
-            store.addScore(50);
-        }
-
-        if (this.bannerTimer > 0) {
-            this.bannerTimer--;
-        }
+        if (this.bannerTimer > 0) this.bannerTimer--;
     }
 
     drawSkyBackground() {
         const w = this.canvas.width;
         const h = this.canvas.height;
 
-        // 1. Vibrant Sky Linear Gradient
         const skyGrad = this.ctx.createLinearGradient(0, 0, 0, h);
         skyGrad.addColorStop(0, '#0284c7');
         skyGrad.addColorStop(0.5, '#38bdf8');
@@ -378,7 +566,6 @@ class PlatformerGame {
         this.ctx.fillStyle = skyGrad;
         this.ctx.fillRect(0, 0, w, h);
 
-        // 2. Sun & Radiant Glow
         const sunX = w * 0.82;
         const sunY = 55;
         const sunGlow = this.ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 60);
@@ -395,7 +582,6 @@ class PlatformerGame {
         this.ctx.arc(sunX, sunY, 22, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // 3. Fluffy Clouds
         const clouds = [
             { x: w * 0.12, y: 70, scale: 0.85 },
             { x: w * 0.48, y: 115, scale: 1.1 },
@@ -416,26 +602,56 @@ class PlatformerGame {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Render Sunny Sky Background
+        // Render Sunny Sky
         this.drawSkyBackground();
 
-        // Render Goal (ประตูสีเขียว)
+        // Render Goal (ประตูสีเขียว + แม่กุญแจ)
         if (this.goal) {
-            this.ctx.fillStyle = '#10b981';
+            this.ctx.fillStyle = this.goal.isLocked ? '#64748b' : '#10b981';
             this.ctx.fillRect(this.goal.x, this.goal.y, this.goal.width, this.goal.height);
             this.ctx.fillStyle = '#fef08a';
             this.ctx.fillRect(this.goal.x + this.goal.width - 8, this.goal.y + this.goal.height / 2 - 3, 5, 6);
+            if (this.goal.isLocked) {
+                this.ctx.fillStyle = '#ef4444';
+                this.ctx.font = '12px sans-serif';
+                this.ctx.fillText('🔒', this.goal.x + 8, this.goal.y + 24);
+            }
         }
 
         // Render Platforms
         this.platforms.forEach(plat => {
-            this.ctx.fillStyle = '#334155';
+            if (plat.isDestroyed) return;
+            this.ctx.fillStyle = plat.type === 'crumble' ? '#78350f' : '#334155';
             this.ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
-            this.ctx.fillStyle = '#22c55e';
+            this.ctx.fillStyle = plat.type === 'crumble' ? '#f59e0b' : '#22c55e';
             this.ctx.fillRect(plat.x, plat.y, plat.width, 3);
         });
 
-        // Render Spikes (อุปสรรคหนามสีแดง)
+        // Render Springs
+        this.springs.forEach(sp => {
+            this.ctx.fillStyle = '#a855f7';
+            this.ctx.fillRect(sp.x, sp.y, sp.width, sp.height);
+        });
+
+        // Render Key Item
+        if (this.keyItem && !this.keyItem.collected) {
+            this.ctx.fillStyle = '#facc15';
+            this.ctx.font = '18px sans-serif';
+            this.ctx.fillText('🔑', this.keyItem.x, this.keyItem.y + 16);
+        }
+
+        // Render Power-up Items
+        this.powerups.forEach(pw => {
+            if (!pw.collected) {
+                this.ctx.beginPath();
+                this.ctx.arc(pw.x, pw.y, pw.radius, 0, Math.PI * 2);
+                this.ctx.fillStyle = pw.type === 'shield' ? '#38bdf8' : (pw.type === 'magnet' ? '#ec4899' : '#f97316');
+                this.ctx.fill();
+                this.ctx.closePath();
+            }
+        });
+
+        // Render Spikes
         this.spikes.forEach(spike => {
             this.ctx.fillStyle = '#dc2626';
             const count = Math.max(1, Math.floor(spike.width / 10));
@@ -464,7 +680,7 @@ class PlatformerGame {
             }
         });
 
-        // Render Animated Player Image
+        // Render Animated Player Image & Active Shield Aura
         const p = this.player;
         if (this.playerImg.complete && this.playerImg.naturalWidth !== 0) {
             this.ctx.save();
@@ -479,6 +695,17 @@ class PlatformerGame {
             this.ctx.rotate(p.rotation);
             this.ctx.scale(p.scaleX, p.scaleY);
 
+            // Active Shield Aura Effect
+            if (p.hasShield) {
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, p.width / 1.8, 0, Math.PI * 2);
+                this.ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#38bdf8';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
+
             this.ctx.drawImage(
                 this.playerImg,
                 -p.width / 2,
@@ -488,17 +715,18 @@ class PlatformerGame {
             );
 
             this.ctx.restore();
-        } else {
-            this.ctx.fillStyle = p.color;
-            this.ctx.fillRect(p.x, p.y, p.width, p.height);
-            this.ctx.fillStyle = '#ffffff';
-            const eyeOffset = this.keys.left ? 3 : (this.keys.right ? 13 : 8);
-            this.ctx.fillRect(p.x + eyeOffset, p.y + 6, 4, 4);
         }
+
+        // Render Active Status HUD Indicators
+        this.ctx.font = '12px sans-serif';
+        this.ctx.fillStyle = '#ffffff';
+        if (p.hasShield) this.ctx.fillText('🛡️ โล่ทำงาน', 12, 24);
+        if (p.magnetTimer > 0) this.ctx.fillText('🧲 แม่เหล็ก', 12, 40);
+        if (p.boostTimer > 0) this.ctx.fillText('🔥 สปีดไฟ', 12, 56);
 
         // Render Level Up Banner Text
         if (this.bannerTimer > 0) {
-            this.ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+            this.ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
             this.ctx.fillRect(0, this.canvas.height / 2 - 30, this.canvas.width, 60);
             this.ctx.fillStyle = '#facc15';
             this.ctx.font = 'bold 20px sans-serif';
@@ -515,7 +743,6 @@ class PlatformerGame {
     }
 }
 
-// Boot App Engine
 window.addEventListener('DOMContentLoaded', () => {
     new PlatformerGame();
 });
