@@ -227,13 +227,14 @@ class PlatformerGame {
     }
 
     setupTouchControls() {
-        const bindBtn = (id, key) => {
+        const bindBtn = (id, key, onPress) => {
             const btn = document.getElementById(id);
             if (!btn) return;
             const start = (e) => {
                 e.preventDefault();
                 this.keys[key] = true;
                 btn.classList.add('pressed');
+                if (onPress) onPress();
             };
             const end = (e) => {
                 e.preventDefault();
@@ -250,8 +251,8 @@ class PlatformerGame {
 
         bindBtn('btn-left', 'left');
         bindBtn('btn-right', 'right');
-        bindBtn('btn-jump', 'jump');
-        bindBtn('btn-dash', 'dash');
+        bindBtn('btn-jump', 'jump', () => this.handleJumpTrigger());
+        bindBtn('btn-dash', 'dash', () => this.handleDashTrigger());
     }
 
     setupKeyboardControls() {
@@ -320,12 +321,6 @@ class PlatformerGame {
         if (state.isGameOver || state.activeTab !== 'game') return;
 
         const p = this.player;
-
-        // Check Touch Dash Key Trigger
-        if (this.keys.dash) {
-            this.handleDashTrigger();
-            this.keys.dash = false;
-        }
 
         // Active Power-up Timers & Boosts
         if (p.boostTimer > 0) p.boostTimer--;
