@@ -127,6 +127,7 @@ class PlatformerGame {
         this.springs = [];
         this.powerups = [];
         this.enemies = [];
+        this.boss = null;
         this.projectiles = [];
         this.checkpoint = null;
         this.spawnPoint = { x: 25, y: 0 };
@@ -139,6 +140,14 @@ class PlatformerGame {
         this.floatingTexts = [];
         this.shakeTimer = 0;
         this.shakeIntensity = 0;
+        this.hitFreezeTimer = 0;
+
+        // Combo Multiplier System
+        this.comboCount = 0;
+        this.comboTimer = 0;
+
+        // Dynamic BGM & Danger Warning State
+        this.isLavaNear = false;
 
         // Visual Theme State ('sky', 'volcano', 'night')
         this.currentTheme = 'sky';
@@ -232,22 +241,18 @@ class PlatformerGame {
         this.canvas.height = container.clientHeight;
     }
 
-    // ระบบเจนเนอเรตด่านแบบไดนามิก 40 ด่านที่มีเอกลักษณ์ไม่ซ้ำกัน
     getLevelData(level, w, h) {
         if (level > 40) {
-            return null; // จบเกมแล้ว
+            return null;
         }
 
-        // กำหนดธีมตามช่วงด่าน
         let theme = 'sky';
         if (level >= 11 && level <= 25) theme = 'volcano';
         if (level >= 26) theme = 'night';
 
-        // ปรับความเร็วลาวาและเวลาเป้าหมายตามความยากของด่าน
         const lavaSpeed = Math.min(0.52, 0.08 + (level - 1) * 0.0115);
         const targetTime = Math.max(10, 20 - Math.floor((level - 1) / 3));
 
-        // ปูลูกเล่นแท่นตามระดับด่านที่สูงขึ้น
         const allowedTypes = ['normal'];
         if (level >= 2) allowedTypes.push('bounce');
         if (level >= 5) allowedTypes.push('ice');
@@ -256,7 +261,8 @@ class PlatformerGame {
         if (level >= 22) allowedTypes.push('phase');
         if (level >= 28) allowedTypes.push('moving');
 
-        const platformCount = Math.min(9, 5 + Math.floor(level / 7));
+        const isBossLevel = (level % 10 === 0);
+        const platformCount = isBossLevel ? 4 : Math.min(9, 5 + Math.floor(level / 7));
         const verticalGap = Math.min(68, 48 + Math.floor(level * 0.45));
         const baseWidthRatio = Math.max(0.15, 0.38 - (level * 0.0055));
 
@@ -264,14 +270,13 @@ class PlatformerGame {
 
         for (let i = 1; i <= platformCount; i++) {
             const platY = h - 20 - (i * verticalGap);
-            const platWidth = w * baseWidthRatio;
+            const platWidth = isBossLevel ? w * 0.5 : w * baseWidthRatio;
 
-            // สูตรคณิตศาสตร์ล็อกคำนวณตำแหน่ง X เพื่อให้แต่ละด่านมีตำแหน่งแท่นไม่ซ้ำกันแน่นอน
             const seed = Math.abs(Math.sin(level * 12.9898 + i * 78.233));
             const platX = seed * (w - platWidth - 30) + 15;
 
             let pType = 'normal';
-            if (i > 0) {
+            if (i > 0 && !isBossLevel) {
                 const typeIdx = Math.floor(seed * allowedTypes.length);
                 pType = allowedTypes[typeIdx] || 'normal';
             }
@@ -291,6 +296,7 @@ class PlatformerGame {
                 platObj.timer = 0;
                 platObj.isCrumbling = false;
                 platObj.isDestroyed = false;
+                platObj.respawnTimer = 0; // 👈 กำหนดตัวแปรรอเกิดใหม่
             } else if (pType === 'moving') {
                 platObj.vx = (i % 2 === 0 ? 1 : -1) * (1.1 + (level * 0.03));
                 platObj.minX = Math.max(10, platX - w * 0.15);
@@ -300,7 +306,6 @@ class PlatformerGame {
             platforms.push(platObj);
         }
 
-        // เหรียญรางวัล
         const coins = [];
         for (let i = 1; i < platforms.length; i++) {
             if (i % 2 === 1 || level < 12) {
@@ -313,9 +318,8 @@ class PlatformerGame {
             }
         }
 
-        // หนามอันตราย
         const spikes = [];
-        if (level >= 3) {
+        if (level >= 3 && !isBossLevel) {
             const spikeW = Math.min(w * 0.4, w * 0.12 + (level * 0.006 * w));
             spikes.push({
                 x: w * 0.32,
@@ -325,41 +329,59 @@ class PlatformerGame {
             });
         }
 
-        // ศัตรู
         const enemies = [];
-        if (level >= 2) {
-            const topPlat = platforms[platforms.length - 2] || platforms[1];
-            const isRanged = (level >= 12 && level % 3 === 0);
-            enemies.push({
-                x: topPlat.x + 5,
-                y: topPlat.y - 28,
-                width: 32,
-                height: 28,
-                vx: isRanged ? 0 : (1.0 + level * 0.025),
-                minX: topPlat.x,
-                maxX: topPlat.x + topPlat.width - 32,
-                isDefeated: false,
-                isRanged: isRanged,
-                shootTimer: 0
-            });
+        let boss = null;
+
+        if (isBossLevel) {
+            const bossPlat = platforms[Math.floor(platforms.length / 2)];
+            const bossHp = Math.min(3 + Math.floor(level / 10) * 2, 9);
+            boss = {
+                x: bossPlat.x + bossPlat.width / 2 - 25,
+                y: bossPlat.y - 45,
+                width: 50,
+                height: 45,
+                hp: bossHp,
+                maxHp: bossHp,
+                vx: 1.8 + (level * 0.02),
+                minX: bossPlat.x,
+                maxX: bossPlat.x + bossPlat.width - 50,
+                shootTimer: 0,
+                isDefeated: false
+            };
+        } else {
+            if (level >= 2) {
+                const topPlat = platforms[platforms.length - 2] || platforms[1];
+                const isRanged = (level >= 12 && level % 3 === 0);
+                enemies.push({
+                    x: topPlat.x + 5,
+                    y: topPlat.y - 28,
+                    width: 32,
+                    height: 28,
+                    vx: isRanged ? 0 : (1.0 + level * 0.025),
+                    minX: topPlat.x,
+                    maxX: topPlat.x + topPlat.width - 32,
+                    isDefeated: false,
+                    isRanged: isRanged,
+                    shootTimer: 0
+                });
+            }
+
+            if (level >= 18) {
+                const midPlat = platforms[Math.floor(platforms.length / 2)];
+                enemies.push({
+                    x: midPlat.x + 5,
+                    y: midPlat.y - 28,
+                    width: 32,
+                    height: 28,
+                    vx: 1.2 + (level * 0.02),
+                    minX: midPlat.x,
+                    maxX: midPlat.x + midPlat.width - 32,
+                    isDefeated: false,
+                    isRanged: false
+                });
+            }
         }
 
-        if (level >= 18) {
-            const midPlat = platforms[Math.floor(platforms.length / 2)];
-            enemies.push({
-                x: midPlat.x + 5,
-                y: midPlat.y - 28,
-                width: 32,
-                height: 28,
-                vx: 1.2 + (level * 0.02),
-                minX: midPlat.x,
-                maxX: midPlat.x + midPlat.width - 32,
-                isDefeated: false,
-                isRanged: false
-            });
-        }
-
-        // ไอเทมเสริมพลัง
         const powerups = [];
         if (level % 2 === 0 || level > 25) {
             const pPlat = platforms[1];
@@ -373,9 +395,8 @@ class PlatformerGame {
             });
         }
 
-        // จุดเซฟ Checkpoint
         let checkpoint = null;
-        if (level >= 4 && level % 3 === 0) {
+        if (level >= 4 && level % 3 === 0 && !isBossLevel) {
             const midP = platforms[Math.floor(platforms.length / 2)];
             checkpoint = {
                 x: midP.x + midP.width / 2 - 9,
@@ -386,7 +407,6 @@ class PlatformerGame {
             };
         }
 
-        // กุญแจและประตูทางออก
         const highestPlat = platforms[platforms.length - 1];
         const keyPlat = platforms[Math.floor(platforms.length / 2)];
 
@@ -416,6 +436,7 @@ class PlatformerGame {
             spikes,
             springs: [],
             enemies,
+            boss,
             powerups,
             keyItem,
             goal
@@ -431,10 +452,11 @@ class PlatformerGame {
         this.particles = [];
         this.floatingTexts = [];
         this.projectiles = [];
+        this.comboCount = 0;
+        this.comboTimer = 0;
 
         const currentLevel = store.getState().level;
 
-        // ตรวจสอบเงื่อนไขเมื่อผ่านครบ 40 ด่าน
         if (currentLevel > 40) {
             this.isGameCleared = true;
             this.bannerText = '🎉 ยินดีด้วย! คุณพิชิตครบทั้ง 40 ด่านสำเร็จ!';
@@ -447,11 +469,14 @@ class PlatformerGame {
 
         this.spawnPoint = { x: 25, y: h - 140 };
 
+        const state = store.getState();
+        const dashCooldownBase = Math.max(15, 30 - (state.upgrades?.dashLevel || 0) * 4);
+
         this.player = {
             x: this.spawnPoint.x,
             y: this.spawnPoint.y,
-            width: 36,  // Hitbox กว้าง 36 (Physical Size คงเดิมเพื่อป้องกันการชนแท่นบน)
-            height: 36, // Hitbox สูง 36 (Physical Size คงเดิมเพื่อป้องกันการชนแท่นบน)
+            width: 36,
+            height: 36,
             vx: 0,
             vy: 0,
             speed: 4.8,
@@ -459,23 +484,23 @@ class PlatformerGame {
             isGrounded: false,
             color: '#ef4444',
             
-            // Player Mechanics
             jumpsLeft: 2,
             isDashing: false,
             dashTimer: 0,
             dashCooldown: 0,
+            maxDashCooldown: dashCooldownBase,
             isWallSliding: false,
+            coyoteTimer: 0,
+            jumpBufferTimer: 0,
 
-            // Active Power-ups State
             hasShield: true,
             invincibleTimer: 0,
             magnetTimer: 0,
+            magnetRadius: 140 + (state.upgrades?.magnetLevel || 0) * 30,
             boostTimer: 0,
 
-            // Trail FX Data
             trail: [],
 
-            // Procedural Animation States
             facing: 'right',
             walkTimer: 0,
             idleTimer: 0,
@@ -492,6 +517,7 @@ class PlatformerGame {
         this.spikes = levelData.spikes;
         this.springs = levelData.springs;
         this.enemies = levelData.enemies;
+        this.boss = levelData.boss;
         this.powerups = levelData.powerups;
         this.keyItem = levelData.keyItem;
         this.goal = levelData.goal;
@@ -562,26 +588,41 @@ class PlatformerGame {
         });
     }
 
-    handleJumpTrigger() {
-        if (this.isGameCleared) return;
+    tryExecuteJump() {
         const p = this.player;
-        if (p.isGrounded) {
+        if (!p) return false;
+
+        if (p.isGrounded || p.coyoteTimer > 0) {
             p.vy = p.jumpPower;
             p.isGrounded = false;
+            p.coyoteTimer = 0;
+            p.jumpBufferTimer = 0;
             p.jumpsLeft = 1;
             this.sfx.playJump();
             this.addParticles(p.x + p.width / 2, p.y + p.height, '#ffffff', 6);
+            return true;
         } else if (p.isWallSliding) {
             p.vy = p.jumpPower;
             p.vx = p.facing === 'left' ? p.speed : -p.speed;
             p.isWallSliding = false;
+            p.jumpBufferTimer = 0;
             this.sfx.playJump();
+            return true;
         } else if (p.jumpsLeft > 0) {
             p.vy = p.jumpPower * 0.9;
             p.jumpsLeft--;
+            p.jumpBufferTimer = 0;
             this.sfx.playJump();
             this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 8);
+            return true;
         }
+        return false;
+    }
+
+    handleJumpTrigger() {
+        if (this.isGameCleared) return;
+        this.player.jumpBufferTimer = 8;
+        this.tryExecuteJump();
     }
 
     handleDashTrigger() {
@@ -590,7 +631,7 @@ class PlatformerGame {
         if (p.dashCooldown <= 0 && !p.isDashing) {
             p.isDashing = true;
             p.dashTimer = 10;
-            p.dashCooldown = 30;
+            p.dashCooldown = p.maxDashCooldown || 30;
             this.sfx.playDash();
             this.triggerShake(5, 8);
             this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#facc15', 14);
@@ -619,6 +660,9 @@ class PlatformerGame {
         const p = this.player;
         if (p.invincibleTimer > 0) return;
 
+        this.comboCount = 0;
+        this.comboTimer = 0;
+
         if (p.hasShield) {
             p.hasShield = false;
             p.vy = -8;
@@ -639,12 +683,49 @@ class PlatformerGame {
         const state = store.getState();
         if (state.isGameOver || state.activeTab !== 'game' || this.isGameCleared) return;
 
+        if (this.hitFreezeTimer > 0) {
+            this.hitFreezeTimer--;
+            return;
+        }
+
         const p = this.player;
 
         this.levelTime++;
 
+        if (this.lava) {
+            const lavaDist = this.lava.y - (p.y + p.height);
+            if (lavaDist < 110) {
+                if (this.bgm) this.bgm.playbackRate = 1.25;
+                this.isLavaNear = true;
+            } else {
+                if (this.bgm) this.bgm.playbackRate = 1.0;
+                this.isLavaNear = false;
+            }
+        }
+
+        if (this.comboTimer > 0) {
+            this.comboTimer--;
+            if (this.comboTimer <= 0) {
+                this.comboCount = 0;
+            }
+        }
+
         if (p.invincibleTimer > 0) p.invincibleTimer--;
         if (this.shakeTimer > 0) this.shakeTimer--;
+
+        if (p.jumpBufferTimer > 0) {
+            if (this.tryExecuteJump()) {
+                p.jumpBufferTimer = 0;
+            } else {
+                p.jumpBufferTimer--;
+            }
+        }
+
+        if (p.isGrounded) {
+            p.coyoteTimer = 8;
+        } else if (p.coyoteTimer > 0) {
+            p.coyoteTimer--;
+        }
 
         // Update Particles
         this.particles.forEach(pt => {
@@ -740,10 +821,22 @@ class PlatformerGame {
         if (p.x < 0) p.x = 0;
         if (p.x + p.width > this.canvas.width) p.x = this.canvas.width - p.width;
 
-        // Platforms Mechanics
+        // Platforms Mechanics & Respawn System
         p.isGrounded = false;
         this.platforms.forEach(plat => {
-            if (plat.isDestroyed) return;
+            // 👈 ระบบ Respawn แท่นพัง: นับเวลางอกแท่นกลับคืนมาเพื่อไม่ให้ติดเกาะ
+            if (plat.isDestroyed) {
+                if (plat.type === 'crumble') {
+                    plat.respawnTimer = (plat.respawnTimer || 180) - 1;
+                    if (plat.respawnTimer <= 0) {
+                        plat.isDestroyed = false;
+                        plat.isCrumbling = false;
+                        plat.timer = 0;
+                        this.addParticles(plat.x + plat.width / 2, plat.y, '#f59e0b', 12);
+                    }
+                }
+                return;
+            }
 
             if (plat.type === 'phase') {
                 plat.timer = (plat.timer || 0) + 1;
@@ -799,10 +892,63 @@ class PlatformerGame {
                 plat.timer++;
                 if (plat.timer > 50) {
                     plat.isDestroyed = true;
+                    plat.respawnTimer = 180; // 👈 ตั้งเวลารอเกิดใหม่ 3 วินาที (180 เฟรม)
                     this.addParticles(plat.x + plat.width / 2, plat.y, '#451a03', 15);
                 }
             }
         });
+
+        // BOSS Update & Combat Logic
+        if (this.boss && !this.boss.isDefeated) {
+            const b = this.boss;
+            b.x += b.vx;
+            if (b.x <= b.minX || b.x + b.width >= b.maxX) {
+                b.vx *= -1;
+            }
+
+            b.shootTimer++;
+            if (b.shootTimer >= 70) {
+                b.shootTimer = 0;
+                this.projectiles.push({
+                    x: b.x + b.width / 2,
+                    y: b.y + b.height / 2,
+                    vx: (p.x < b.x) ? -3.5 : 3.5,
+                    vy: -1.2,
+                    radius: 7,
+                    color: '#f97316'
+                });
+            }
+
+            if (
+                p.x < b.x + b.width &&
+                p.x + p.width > b.x &&
+                p.y < b.y + b.height &&
+                p.y + p.height > b.y
+            ) {
+                if (p.vy > 0 && (p.y + p.height - p.vy) <= b.y + 16) {
+                    b.hp--;
+                    p.vy = -10.5;
+                    this.sfx.playHit();
+                    this.triggerShake(12, 16);
+                    this.hitFreezeTimer = 6;
+                    this.addParticles(b.x + b.width / 2, b.y + b.height / 2, '#ef4444', 22);
+
+                    if (b.hp <= 0) {
+                        b.isDefeated = true;
+                        store.addScore(300);
+                        this.addFloatingText(b.x, b.y, '🏆 บอสพ่ายแพ้! +300', '#facc15');
+                        if (this.keyItem) {
+                            this.keyItem.x = b.x + b.width / 2 - 10;
+                            this.keyItem.y = b.y;
+                        }
+                    } else {
+                        this.addFloatingText(b.x, b.y, `BOSS HP: ${b.hp}/${b.maxHp}`, '#ef4444');
+                    }
+                } else {
+                    this.handlePlayerDamage();
+                }
+            }
+        }
 
         // Enemies & Projectiles
         this.enemies.forEach(enemy => {
@@ -841,7 +987,8 @@ class PlatformerGame {
                     p.vy = -10.0;
                     store.addScore(50);
                     this.sfx.playHit();
-                    this.triggerShake(6, 10);
+                    this.triggerShake(10, 14);
+                    this.hitFreezeTimer = 4;
                     this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 18);
                     this.addFloatingText(enemy.x, enemy.y, '+50', '#a855f7');
                 } else {
@@ -915,24 +1062,34 @@ class PlatformerGame {
             }
         });
 
-        // Coins & Magnet
+        // Coins Collection with Combo Multiplier System
+        const magnetDist = (p.magnetTimer > 0) ? (p.magnetRadius || 200) : 0;
         this.coins.forEach(coin => {
             if (!coin.collected) {
                 const dx = (p.x + p.width / 2) - coin.x;
                 const dy = (p.y + p.height / 2) - coin.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
-                if (p.magnetTimer > 0 && dist < 140) {
-                    coin.x += (dx / dist) * -4.0;
-                    coin.y += (dy / dist) * -4.0;
+                if (magnetDist > 0 && dist < magnetDist) {
+                    coin.x += (dx / dist) * -4.5;
+                    coin.y += (dy / dist) * -4.5;
                 }
 
                 if (dist < coin.radius + p.width / 2) {
                     coin.collected = true;
-                    store.addScore(10);
+                    this.comboCount++;
+                    this.comboTimer = 180;
+
+                    const multiplier = Math.min(5, 1 + Math.floor(this.comboCount / 3));
+                    const basePoints = 10;
+                    const earned = basePoints * multiplier;
+
+                    store.addScore(earned);
                     this.sfx.playCoin();
                     this.addParticles(coin.x, coin.y, '#facc15', 8);
-                    this.addFloatingText(coin.x, coin.y, '+10', '#facc15');
+
+                    const comboText = multiplier > 1 ? `+${earned} (x${multiplier}!)` : `+${earned}`;
+                    this.addFloatingText(coin.x, coin.y, comboText, multiplier > 1 ? '#f59e0b' : '#facc15');
                 }
             }
         });
@@ -1017,7 +1174,6 @@ class PlatformerGame {
             this.ctx.fillStyle = caveGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            // Parallax Lava Mountains Background
             this.ctx.fillStyle = 'rgba(69, 26, 3, 0.45)';
             this.ctx.beginPath();
             this.ctx.moveTo(0, h);
@@ -1028,7 +1184,6 @@ class PlatformerGame {
             this.ctx.lineTo(w, h);
             this.ctx.fill();
 
-            // Lava Ambient Heat Glow
             const glowGrad = this.ctx.createRadialGradient(w / 2, h, 20, w / 2, h, h * 0.85);
             glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.45)');
             glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -1043,7 +1198,6 @@ class PlatformerGame {
             this.ctx.fillStyle = nightGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            // Glowing Moon with Aura
             const moonX = w * 0.82;
             const moonY = 65;
             const moonGlow = this.ctx.createRadialGradient(moonX, moonY, 15, moonX, moonY, 60);
@@ -1057,7 +1211,6 @@ class PlatformerGame {
             this.ctx.arc(moonX, moonY, 22, 0, Math.PI * 2);
             this.ctx.fill();
 
-            // Twinkling Stars
             const stars = [
                 { x: w * 0.1, y: 40, s: 2 }, { x: w * 0.35, y: 80, s: 1.5 }, 
                 { x: w * 0.55, y: 35, s: 2.5 }, { x: w * 0.72, y: 110, s: 1.8 },
@@ -1069,7 +1222,6 @@ class PlatformerGame {
                 this.ctx.fillRect(st.x, st.y, st.s, st.s);
             });
 
-            // Parallax Distant Night City/Mountains
             this.ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
             this.ctx.beginPath();
             this.ctx.moveTo(0, h);
@@ -1081,7 +1233,6 @@ class PlatformerGame {
             this.ctx.fill();
 
         } else {
-            // Sky Theme
             const skyGrad = this.ctx.createLinearGradient(0, 0, 0, h);
             skyGrad.addColorStop(0, '#0284c7');
             skyGrad.addColorStop(0.5, '#38bdf8');
@@ -1089,7 +1240,6 @@ class PlatformerGame {
             this.ctx.fillStyle = skyGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            // Parallax Animated Clouds
             const clouds = [
                 { x: (w * 0.12 + time * 15) % (w + 100) - 50, y: 70, scale: 0.85 },
                 { x: (w * 0.48 + time * 10) % (w + 120) - 60, y: 115, scale: 1.1 },
@@ -1111,7 +1261,6 @@ class PlatformerGame {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Screen Shake Translate
         this.ctx.save();
         if (this.shakeTimer > 0) {
             const rx = (Math.random() - 0.5) * this.shakeIntensity;
@@ -1168,7 +1317,7 @@ class PlatformerGame {
             this.ctx.fill();
         }
 
-        // Render Rising Animated Lava with Sine Wave
+        // Render Lava
         if (this.lava) {
             this.ctx.save();
             this.ctx.shadowBlur = 15;
@@ -1198,7 +1347,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Goal with Portal Neon Effect
+        // Render Goal
         if (this.goal) {
             this.ctx.save();
             const isLocked = this.goal.isLocked;
@@ -1239,7 +1388,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Platforms with Rounded Caps & Gradients
+        // Render Platforms
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
             if (plat.type === 'phase' && !plat.active) return;
@@ -1289,21 +1438,37 @@ class PlatformerGame {
                 this.ctx.fillRect(plat.x, plat.y, plat.width, 4);
             }
 
-            if (plat.type === 'conveyor_left' || plat.type === 'conveyor_right') {
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-                const dir = plat.type === 'conveyor_left' ? -1 : 1;
-                const offset = (this.levelTime * 2 * dir) % 12;
-                for (let cx = plat.x + offset; cx < plat.x + plat.width; cx += 12) {
-                    if (cx >= plat.x && cx <= plat.x + plat.width - 4) {
-                        this.ctx.fillRect(cx, plat.y + 6, 4, 4);
-                    }
-                }
-            }
-
             this.ctx.restore();
         });
 
-        // Render Enemies (Metal Leafy with Knife)
+        // Render BOSS Entity & HP Bar
+        if (this.boss && !this.boss.isDefeated) {
+            const b = this.boss;
+            this.ctx.save();
+            this.ctx.shadowBlur = 18;
+            this.ctx.shadowColor = '#dc2626';
+
+            this.ctx.fillStyle = '#991b1b';
+            this.ctx.fillRect(b.x, b.y, b.width, b.height);
+            this.ctx.strokeStyle = '#f87171';
+            this.ctx.lineWidth = 3;
+            this.ctx.strokeRect(b.x, b.y, b.width, b.height);
+
+            this.ctx.fillStyle = '#facc15';
+            this.ctx.fillRect(b.x + 10, b.y + 12, 8, 8);
+            this.ctx.fillRect(b.x + b.width - 18, b.y + 12, 8, 8);
+
+            const hpWidth = b.width;
+            const currentHpW = (b.hp / b.maxHp) * hpWidth;
+            this.ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            this.ctx.fillRect(b.x, b.y - 14, hpWidth, 8);
+            this.ctx.fillStyle = '#ef4444';
+            this.ctx.fillRect(b.x, b.y - 14, currentHpW, 8);
+
+            this.ctx.restore();
+        }
+
+        // Render Enemies
         this.enemies.forEach(e => {
             if (e.isDefeated) return;
             this.ctx.save();
@@ -1322,13 +1487,11 @@ class PlatformerGame {
             if (this.enemyImg.complete && this.enemyImg.naturalWidth !== 0) {
                 this.ctx.drawImage(this.enemyImg, -renderW / 2, -renderH, renderW, renderH);
             } else {
-                // Vector Metal Leafy Draw
                 const w = renderW;
                 const h = renderH;
 
                 this.ctx.translate(0, -h / 2);
 
-                // Leaf Body (Metal Gray Gradient)
                 const leafGrad = this.ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
                 leafGrad.addColorStop(0, '#9ca3af');
                 leafGrad.addColorStop(0.5, '#6b7280');
@@ -1344,7 +1507,6 @@ class PlatformerGame {
                 this.ctx.closePath();
                 this.ctx.fill();
 
-                // Leaf Center Seam Line
                 this.ctx.strokeStyle = '#374151';
                 this.ctx.lineWidth = 1;
                 this.ctx.beginPath();
@@ -1352,46 +1514,11 @@ class PlatformerGame {
                 this.ctx.lineTo(0, h / 2 - 2);
                 this.ctx.stroke();
 
-                // Eyes (Sinister Slits)
                 this.ctx.fillStyle = '#000000';
                 this.ctx.beginPath();
                 this.ctx.ellipse(-w / 5, -h / 8, 2, 4, -0.2, 0, Math.PI * 2);
                 this.ctx.ellipse(w / 5, -h / 8, 2, 4, 0.2, 0, Math.PI * 2);
                 this.ctx.fill();
-
-                // Sinister Smile
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.strokeStyle = '#000000';
-                this.ctx.lineWidth = 1.5;
-                this.ctx.beginPath();
-                this.ctx.arc(0, h / 10, w / 3.5, 0.1 * Math.PI, 0.9 * Math.PI, false);
-                this.ctx.closePath();
-                this.ctx.fill();
-                this.ctx.stroke();
-
-                // Black Arm & Knife
-                this.ctx.strokeStyle = '#000000';
-                this.ctx.lineWidth = 2.5;
-                this.ctx.beginPath();
-                this.ctx.moveTo(w / 3, 0);
-                this.ctx.lineTo(w / 1.4, -h / 6);
-                this.ctx.stroke();
-
-                // Knife Handle
-                this.ctx.fillStyle = '#78350f';
-                this.ctx.fillRect(w / 1.4 - 2, -h / 6 - 8, 4, 8);
-
-                // Knife Blade
-                this.ctx.fillStyle = '#e5e7eb';
-                this.ctx.strokeStyle = '#9ca3af';
-                this.ctx.lineWidth = 1;
-                this.ctx.beginPath();
-                this.ctx.moveTo(w / 1.4, -h / 6 - 8);
-                this.ctx.lineTo(w / 1.4 - 4, -h / 6 - 22);
-                this.ctx.quadraticCurveTo(w / 1.4 + 6, -h / 6 - 16, w / 1.4 + 2, -h / 6 - 8);
-                this.ctx.closePath();
-                this.ctx.fill();
-                this.ctx.stroke();
             }
 
             this.ctx.restore();
@@ -1409,13 +1536,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // Render Springs
-        this.springs.forEach(sp => {
-            this.ctx.fillStyle = '#ec4899';
-            this.ctx.fillRect(sp.x, sp.y, sp.width, sp.height);
-        });
-
-        // Render Floating Vector Key Item
+        // Render Key Item
         if (this.keyItem && !this.keyItem.collected) {
             this.ctx.save();
             const keyY = this.keyItem.y + Math.sin(this.levelTime * 0.08) * 4;
@@ -1456,31 +1577,11 @@ class PlatformerGame {
                 this.ctx.fillStyle = mainColor;
                 this.ctx.fill();
 
-                this.ctx.beginPath();
-                this.ctx.arc(pw.x - 3, pw.y - 3, pulseRadius * 0.4, 0, Math.PI * 2);
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.fill();
-
                 this.ctx.restore();
             }
         });
 
-        // Render Spikes
-        this.spikes.forEach(spike => {
-            this.ctx.fillStyle = '#dc2626';
-            const count = Math.max(1, Math.floor(spike.width / 10));
-            const spikeW = spike.width / count;
-            for (let i = 0; i < count; i++) {
-                this.ctx.beginPath();
-                this.ctx.moveTo(spike.x + i * spikeW, spike.y + spike.height);
-                this.ctx.lineTo(spike.x + (i + 0.5) * spikeW, spike.y);
-                this.ctx.lineTo(spike.x + (i + 1) * spikeW, spike.y + spike.height);
-                this.ctx.closePath();
-                this.ctx.fill();
-            }
-        });
-
-        // Render Coins with 3D Spin Effect
+        // Render Coins
         this.coins.forEach(coin => {
             if (!coin.collected) {
                 const spinScale = Math.abs(Math.sin(this.levelTime * 0.08));
@@ -1498,10 +1599,6 @@ class PlatformerGame {
                 this.ctx.strokeStyle = '#eab308';
                 this.ctx.stroke();
 
-                this.ctx.beginPath();
-                this.ctx.arc(0, 0, coin.radius * 0.5, 0, Math.PI * 2);
-                this.ctx.fillStyle = '#fef08a';
-                this.ctx.fill();
                 this.ctx.restore();
             }
         });
@@ -1523,13 +1620,11 @@ class PlatformerGame {
                 this.ctx.rotate(p.rotation);
                 this.ctx.scale(p.scaleX, p.scaleY);
 
-                // 👈 เพิ่มขนาดตัวละครเป็น 2.0x ให้สูงใหญ่ชัดเจนสะใจบนหน้าจอ
                 const renderW = p.width * 2.0;
                 const renderH = p.height * 2.0;
 
                 if (p.hasShield) {
                     this.ctx.beginPath();
-                    // 👈 กระชับวงกลมโล่ให้อยู่พอดีตัว ไม่ใหญ่เว่อร์เกินไป
                     this.ctx.arc(0, -renderH / 2, renderH * 0.52, 0, Math.PI * 2);
                     this.ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
                     this.ctx.fill();
@@ -1559,15 +1654,29 @@ class PlatformerGame {
             this.ctx.globalAlpha = 1.0;
         });
 
-        // Render HUD Info
+        // Render HUD Info & Combo UI
         const elapsed = Math.floor(this.levelTime / 60);
         this.ctx.font = 'bold 12px sans-serif';
         this.ctx.fillStyle = elapsed > this.targetTime ? '#ef4444' : '#ffffff';
         this.ctx.fillText(`⏱️ เวลา: ${elapsed}s / ${this.targetTime}s (ดาว 3)`, 12, 20);
 
-        if (p.hasShield) {
-            this.ctx.fillStyle = '#38bdf8';
-            this.ctx.fillText('🛡️ โล่ทำงาน', 12, 38);
+        if (this.comboCount > 1) {
+            const currentMult = Math.min(5, 1 + Math.floor(this.comboCount / 3));
+            this.ctx.fillStyle = '#f59e0b';
+            this.ctx.font = 'bold 14px sans-serif';
+            this.ctx.fillText(`🔥 COMBO x${currentMult} (${this.comboCount})`, 12, 55);
+        }
+
+        // Lava Warning Red Vignette Overlay
+        if (this.isLavaNear) {
+            this.ctx.fillStyle = `rgba(239, 68, 68, ${0.15 + Math.sin(this.levelTime * 0.2) * 0.1})`;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            this.ctx.fillStyle = '#ef4444';
+            this.ctx.font = 'bold 14px sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('⚠️ ระวังลาวา!', this.canvas.width / 2, 25);
+            this.ctx.textAlign = 'left';
         }
 
         if (this.bannerTimer > 0) {
