@@ -20,32 +20,35 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    max-width: 480px;
+    width: 100%;
+    max-width: 540px;
     margin: 0 auto;
     background-color: #1e293b;
     position: relative;
+    box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
 }
 
 /* Header */
 .app-header {
-    height: 56px;
+    height: 60px;
     background-color: #0f172a;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
+    padding: 0 20px;
     border-bottom: 1px solid #334155;
 }
 
 .app-header h1 {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     color: #38bdf8;
+    font-weight: 700;
 }
 
 .header-stats {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     display: flex;
-    gap: 12px;
+    gap: 16px;
     color: #94a3b8;
 }
 
@@ -64,7 +67,7 @@ body {
     display: none;
     height: 100%;
     width: 100%;
-    padding: 16px;
+    padding: 20px;
     overflow-y: auto;
 }
 
@@ -100,7 +103,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(15, 23, 42, 0.85);
+    background-color: rgba(15, 23, 42, 0.88);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -113,67 +116,72 @@ canvas {
 
 .modal-card {
     background-color: #1e293b;
-    padding: 24px;
-    border-radius: 12px;
+    padding: 28px;
+    border-radius: 16px;
     text-align: center;
-    border: 1px solid #334155;
-    width: 80%;
-    max-width: 300px;
+    border: 1px solid #475569;
+    width: 85%;
+    max-width: 360px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
 
 .modal-card h2 {
     color: #ef4444;
-    margin-bottom: 12px;
+    font-size: 1.5rem;
+    margin-bottom: 14px;
 }
 
 .modal-card p {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     color: #cbd5e1;
+    font-size: 1.1rem;
 }
 
 /* Mobile Touch Controls */
 .touch-controls {
-    height: 130px;
+    height: 155px;
     background-color: #0f172a;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
-    border-top: 1px solid #334155;
+    padding: 14px 20px;
+    border-top: 2px solid #334155;
 }
 
 .dpad, .action-btns {
     display: flex;
-    gap: 8px;
+    gap: 12px;
+    align-items: center;
 }
 
 .touch-btn {
-    width: 58px;
-    height: 58px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     border: none;
     background-color: #334155;
     color: #ffffff;
-    font-size: 1.1rem;
+    font-size: 1.3rem;
     font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
     touch-action: manipulation;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+    transition: transform 0.05s ease, background-color 0.1s ease;
 }
 
 .touch-btn:active, .touch-btn.pressed {
     background-color: #0284c7;
-    transform: scale(0.95);
+    transform: scale(0.92);
 }
 
 .btn-action {
-    width: 75px;
-    height: 58px;
-    border-radius: 29px;
+    width: 96px;
+    height: 72px;
+    border-radius: 36px;
     background-color: #16a34a;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
 }
 
 .btn-action:active, .btn-action.pressed {
@@ -181,12 +189,12 @@ canvas {
 }
 
 .btn-dash {
-    width: 68px;
-    height: 58px;
-    border-radius: 29px;
+    width: 88px;
+    height: 72px;
+    border-radius: 36px;
     background-color: #eab308;
     color: #0f172a;
-    font-size: 0.85rem;
+    font-size: 1rem;
 }
 
 .btn-dash:active, .btn-dash.pressed {
@@ -196,39 +204,54 @@ canvas {
 /* UI Cards & Buttons */
 .card {
     background-color: #334155;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 12px;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
 
 .card h2 {
-    font-size: 1.1rem;
-    margin-bottom: 16px;
+    font-size: 1.25rem;
+    margin-bottom: 18px;
     color: #38bdf8;
 }
 
 .stat-row {
     display: flex;
     justify-content: space-between;
-    padding: 8px 0;
+    padding: 12px 0;
     border-bottom: 1px solid #475569;
+    font-size: 1rem;
 }
 
 .setting-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
+    font-size: 1.05rem;
+}
+
+.setting-item input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    accent-color: #38bdf8;
+    cursor: pointer;
 }
 
 .btn {
     width: 100%;
-    padding: 12px;
-    border-radius: 6px;
+    padding: 14px;
+    border-radius: 8px;
     border: none;
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: bold;
     cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.btn:active {
+    opacity: 0.85;
 }
 
 .btn-primary {
@@ -243,7 +266,7 @@ canvas {
 
 /* Bottom Navigation */
 .bottom-nav {
-    height: 60px;
+    height: 68px;
     background-color: #0f172a;
     display: flex;
     border-top: 1px solid #334155;
@@ -258,7 +281,8 @@ canvas {
     border: none;
     background: transparent;
     color: #64748b;
-    gap: 2px;
+    gap: 4px;
+    cursor: pointer;
 }
 
 .nav-btn.active {
@@ -266,9 +290,90 @@ canvas {
 }
 
 .nav-icon {
-    font-size: 1.2rem;
+    font-size: 1.4rem;
 }
 
 .nav-label {
-    font-size: 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* Tablet & Large Screen Layout Adjustments */
+@media (min-width: 640px) {
+    #app {
+        max-width: 800px;
+        border-left: 1px solid #334155;
+        border-right: 1px solid #334155;
+    }
+
+    .app-header {
+        height: 64px;
+        padding: 0 28px;
+    }
+
+    .app-header h1 {
+        font-size: 1.35rem;
+    }
+
+    .header-stats {
+        font-size: 1.05rem;
+        gap: 24px;
+    }
+
+    .touch-controls {
+        height: 170px;
+        padding: 16px 36px;
+    }
+
+    .dpad, .action-btns {
+        gap: 16px;
+    }
+
+    .touch-btn {
+        width: 82px;
+        height: 82px;
+        font-size: 1.5rem;
+    }
+
+    .btn-action {
+        width: 115px;
+        height: 82px;
+        font-size: 1.2rem;
+    }
+
+    .btn-dash {
+        width: 105px;
+        height: 82px;
+        font-size: 1.1rem;
+    }
+
+    .bottom-nav {
+        height: 72px;
+    }
+
+    .nav-icon {
+        font-size: 1.6rem;
+    }
+
+    .nav-label {
+        font-size: 0.85rem;
+    }
+
+    .tab-view {
+        padding: 28px;
+    }
+
+    .card {
+        padding: 24px;
+        margin-bottom: 20px;
+    }
+
+    .card h2 {
+        font-size: 1.4rem;
+    }
+
+    .stat-row {
+        font-size: 1.1rem;
+        padding: 14px 0;
+    }
 }
