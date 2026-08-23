@@ -144,30 +144,30 @@ canvas {
 
 /* Mobile Touch Controls */
 .touch-controls {
-    height: 160px;
+    height: 155px;
     flex-shrink: 0;
     background-color: #0f172a;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 14px;
+    padding: 14px 20px;
     border-top: 2px solid #334155;
 }
 
 .dpad, .action-btns {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     align-items: center;
 }
 
 .touch-btn {
-    width: 58px;
-    height: 58px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     border: none;
     background-color: #334155;
     color: #ffffff;
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     font-weight: bold;
     display: flex;
     align-items: center;
@@ -182,23 +182,12 @@ canvas {
     transform: scale(0.92);
 }
 
-.btn-down {
-    background-color: #ef4444;
-}
-
-.btn-grapple {
-    width: 58px;
-    height: 58px;
-    background-color: #0284c7;
-    font-size: 1.2rem;
-}
-
 .btn-action {
-    width: 76px;
-    height: 58px;
-    border-radius: 29px;
+    width: 96px;
+    height: 72px;
+    border-radius: 36px;
     background-color: #16a34a;
-    font-size: 0.95rem;
+    font-size: 1.05rem;
 }
 
 .btn-action:active, .btn-action.pressed {
@@ -206,12 +195,12 @@ canvas {
 }
 
 .btn-dash {
-    width: 72px;
-    height: 58px;
-    border-radius: 29px;
+    width: 88px;
+    height: 72px;
+    border-radius: 36px;
     background-color: #eab308;
     color: #0f172a;
-    font-size: 0.9rem;
+    font-size: 1rem;
 }
 
 .btn-dash:active, .btn-dash.pressed {
@@ -451,30 +440,30 @@ canvas {
     }
 
     .touch-controls {
-        height: 160px;
+        height: 155px;
         padding: 14px 28px;
     }
 
     .dpad, .action-btns {
-        gap: 12px;
+        gap: 16px;
     }
 
     .touch-btn {
-        width: 64px;
-        height: 64px;
-        font-size: 1.3rem;
+        width: 76px;
+        height: 76px;
+        font-size: 1.5rem;
     }
 
     .btn-action {
-        width: 88px;
-        height: 64px;
-        font-size: 1.05rem;
+        width: 104px;
+        height: 76px;
+        font-size: 1.15rem;
     }
 
     .btn-dash {
-        width: 80px;
-        height: 64px;
-        font-size: 0.95rem;
+        width: 96px;
+        height: 76px;
+        font-size: 1.05rem;
     }
 
     .bottom-nav {
