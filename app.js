@@ -629,7 +629,6 @@ class PlatformerGame {
 
         bindBtn('btn-left', 'left');
         bindBtn('btn-right', 'right');
-        bindBtn('btn-down', 'down', () => this.handleGroundPoundTrigger());
         bindBtn('btn-jump', 'jump', () => this.handleJumpTrigger());
         bindBtn('btn-dash', 'dash', () => this.handleDashTrigger());
         bindBtn('btn-grapple', 'grapple', () => this.handleGrappleToggle());
