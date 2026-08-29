@@ -101,7 +101,8 @@ class PlatformerGame {
         this.ui = new UIManager();
         this.sfx = new SoundFX();
         
-        this.keys = { left: false, right: false, jump: false, dash: false };
+        // Extended Controls: Added down and grapple
+        this.keys = { left: false, right: false, up: false, down: false, jump: false, dash: false, grapple: false };
         this.animationFrameId = null;
 
         // BGM Setup
@@ -116,11 +117,12 @@ class PlatformerGame {
         this.enemyImg = new Image();
         this.enemyImg.src = 'enemy.png';
 
-        // Physics Constants (ปรับลดแรงโน้มถ่วงให้นุ่มนวลขึ้น)
+        // Physics Constants
         this.GRAVITY = 0.32;
         
         // Game Entities
         this.player = null;
+        this.levelWidth = 1200;
         this.platforms = [];
         this.coins = [];
         this.spikes = [];
@@ -129,14 +131,15 @@ class PlatformerGame {
         this.enemies = [];
         this.boss = null;
         this.projectiles = [];
+        this.grappleNodes = [];
         this.checkpoint = null;
-        this.spawnPoint = { x: 25, y: 0 };
+        this.spawnPoint = { x: 50, y: 0 };
         this.lava = null;
         this.keyItem = null;
         this.goal = null;
 
-        // Camera System
-        this.cameraY = 0;
+        // Camera System (Horizontal)
+        this.cameraX = 0;
 
         // Visual Polish & Juice System
         this.particles = [];
@@ -246,17 +249,14 @@ class PlatformerGame {
     }
 
     getLevelData(level, w, h) {
-        if (level > 40) {
-            return null;
-        }
+        if (level > 40) return null;
 
         let theme = 'sky';
         if (level >= 11 && level <= 25) theme = 'volcano';
         if (level >= 26) theme = 'night';
 
-        // ปรับลดความเร็วลาวาลงให้นิดนึง
-        const lavaSpeed = Math.min(0.42, 0.06 + (level - 1) * 0.009);
-        const targetTime = Math.max(10, 20 - Math.floor((level - 1) / 3));
+        const lavaSpeed = Math.min(1.8, 0.4 + (level - 1) * 0.035);
+        const targetTime = Math.max(15, 30 - Math.floor((level - 1) / 3));
 
         const allowedTypes = ['normal'];
         if (level >= 2) allowedTypes.push('bounce');
@@ -267,170 +267,194 @@ class PlatformerGame {
         if (level >= 28) allowedTypes.push('moving');
 
         const isBossLevel = (level % 10 === 0);
-        const platformCount = isBossLevel ? 4 : Math.min(9, 5 + Math.floor(level / 7));
-        const verticalGap = Math.min(68, 48 + Math.floor(level * 0.45));
-        const baseWidthRatio = Math.max(0.15, 0.38 - (level * 0.0055));
+        const levelWidth = Math.min(4500, Math.floor(w * (3.0 + level * 0.25)));
 
-        const platforms = [{ x: 0, y: h - 20, width: w, height: 20, type: 'normal' }];
+        const platforms = [];
+        const coins = [];
+        const spikes = [];
+        const enemies = [];
+        const powerups = [];
+        const grappleNodes = [];
+        let boss = null;
 
-        for (let i = 1; i <= platformCount; i++) {
-            const platY = h - 20 - (i * verticalGap);
-            const platWidth = isBossLevel ? w * 0.5 : w * baseWidthRatio;
+        // Ground generation with gaps (pits)
+        let currX = 0;
+        // Start ground area (safe zone)
+        platforms.push({ x: 0, y: h - 30, width: 280, height: 30, type: 'normal' });
+        currX = 280;
 
-            const seed = Math.abs(Math.sin(level * 12.9898 + i * 78.233));
-            const platX = seed * (w - platWidth - 30) + 15;
+        let platformId = 0;
+        while (currX < levelWidth - 250) {
+            platformId++;
+            const seed = Math.abs(Math.sin(level * 12.9898 + platformId * 78.233));
+            
+            // Generate Gap
+            const gapWidth = isBossLevel ? 0 : Math.min(140, 60 + Math.floor(seed * 60) + (level * 1.5));
+            currX += gapWidth;
+
+            // Generate Platform Length & Height
+            const platWidth = isBossLevel ? 800 : Math.max(100, 260 - level * 3 + Math.floor(seed * 80));
+            const platY = h - 30 - Math.floor((seed * 0.7) * 90);
 
             let pType = 'normal';
-            if (i > 0 && !isBossLevel) {
+            if (platformId > 1 && !isBossLevel) {
                 const typeIdx = Math.floor(seed * allowedTypes.length);
                 pType = allowedTypes[typeIdx] || 'normal';
             }
 
             const platObj = {
-                x: platX,
+                x: currX,
                 y: platY,
                 width: platWidth,
-                height: 14,
+                height: 20,
                 type: pType
             };
 
             if (pType === 'phase') {
-                platObj.timer = (i * 25) % 80;
-                platObj.active = (i % 2 === 0);
+                platObj.timer = (platformId * 25) % 80;
+                platObj.active = (platformId % 2 === 0);
             } else if (pType === 'crumble') {
                 platObj.timer = 0;
                 platObj.isCrumbling = false;
                 platObj.isDestroyed = false;
                 platObj.respawnTimer = 0;
             } else if (pType === 'moving') {
-                // ปรับลดความเร็วแท่นเคลื่อนที่
-                platObj.vx = (i % 2 === 0 ? 1 : -1) * (0.8 + (level * 0.02));
-                platObj.minX = Math.max(10, platX - w * 0.15);
-                platObj.maxX = Math.min(w - platWidth - 10, platX + w * 0.15);
+                platObj.vx = (platformId % 2 === 0 ? 1 : -1) * (0.8 + (level * 0.02));
+                platObj.minX = Math.max(0, currX - 60);
+                platObj.maxX = Math.min(levelWidth, currX + platWidth + 60);
             }
 
             platforms.push(platObj);
-        }
 
-        const coins = [];
-        for (let i = 1; i < platforms.length; i++) {
-            if (i % 2 === 1 || level < 12) {
+            // Floating upper platforms
+            if (seed > 0.45 && !isBossLevel) {
+                const floatWidth = Math.max(80, platWidth * 0.6);
+                const floatY = platY - 80 - Math.floor(seed * 40);
+                platforms.push({
+                    x: currX + (platWidth - floatWidth) / 2,
+                    y: floatY,
+                    width: floatWidth,
+                    height: 16,
+                    type: 'normal'
+                });
+
+                // Coins on upper floating platform
                 coins.push({
-                    x: platforms[i].x + platforms[i].width / 2,
-                    y: platforms[i].y - 25,
+                    x: currX + platWidth / 2,
+                    y: floatY - 22,
                     radius: 8,
                     collected: false
                 });
             }
-        }
 
-        const spikes = [];
-        if (level >= 3 && !isBossLevel) {
-            const spikeW = Math.min(w * 0.4, w * 0.12 + (level * 0.006 * w));
-            const spikeHeight = 14;
-            spikes.push({
-                x: w * 0.32,
-                y: h - 20 - spikeHeight,
-                width: spikeW,
-                height: spikeHeight
-            });
-        }
+            // Grapple Node over large gaps
+            if (gapWidth > 90 && level >= 3 && !isBossLevel) {
+                grappleNodes.push({
+                    x: currX - gapWidth / 2,
+                    y: platY - 110,
+                    radius: 12
+                });
+            }
 
-        const enemies = [];
-        let boss = null;
+            // Ground coins & items
+            if (platformId % 2 === 0) {
+                coins.push({
+                    x: currX + platWidth / 2,
+                    y: platY - 22,
+                    radius: 8,
+                    collected: false
+                });
+            }
 
-        if (isBossLevel) {
-            const bossPlat = platforms[Math.floor(platforms.length / 2)];
-            const bossHp = Math.min(3 + Math.floor(level / 10) * 2, 9);
-            boss = {
-                x: bossPlat.x + bossPlat.width / 2 - 25,
-                y: bossPlat.y - 45,
-                width: 50,
-                height: 45,
-                hp: bossHp,
-                maxHp: bossHp,
-                // ปรับลดความเร็วบอส
-                vx: 1.3 + (level * 0.015),
-                minX: bossPlat.x,
-                maxX: bossPlat.x + bossPlat.width - 50,
-                shootTimer: 0,
-                isDefeated: false
-            };
-        } else {
-            if (level >= 2) {
-                const topPlat = platforms[platforms.length - 2] || platforms[1];
-                const isRanged = (level >= 12 && level % 3 === 0);
+            // Ground Spikes
+            if (level >= 3 && seed > 0.6 && !isBossLevel && platWidth > 150) {
+                spikes.push({
+                    x: currX + platWidth * 0.4,
+                    y: platY - 14,
+                    width: Math.min(60, platWidth * 0.3),
+                    height: 14
+                });
+            }
+
+            // Enemies patrol on platforms
+            if (level >= 2 && seed > 0.5 && !isBossLevel && platWidth > 120) {
+                const isRanged = (level >= 12 && platformId % 4 === 0);
                 enemies.push({
-                    x: topPlat.x + 5,
-                    y: topPlat.y - 28,
+                    x: currX + 20,
+                    y: platY - 28,
                     width: 32,
                     height: 28,
-                    // ปรับลดความเร็วศัตรู
                     vx: isRanged ? 0 : (0.75 + level * 0.018),
-                    minX: topPlat.x,
-                    maxX: topPlat.x + topPlat.width - 32,
+                    minX: currX,
+                    maxX: currX + platWidth - 32,
                     isDefeated: false,
                     isRanged: isRanged,
                     shootTimer: 0
                 });
             }
 
-            if (level >= 18) {
-                const midPlat = platforms[Math.floor(platforms.length / 2)];
-                enemies.push({
-                    x: midPlat.x + 5,
-                    y: midPlat.y - 28,
-                    width: 32,
-                    height: 28,
-                    // ปรับลดความเร็วศัตรู
-                    vx: 0.9 + (level * 0.015),
-                    minX: midPlat.x,
-                    maxX: midPlat.x + midPlat.width - 32,
-                    isDefeated: false,
-                    isRanged: false
-                });
-            }
+            currX += platWidth;
         }
 
-        const powerups = [];
+        // Final goal platform
+        platforms.push({ x: levelWidth - 250, y: h - 30, width: 250, height: 30, type: 'normal' });
+
+        // Boss Setup
+        if (isBossLevel) {
+            const bossHp = Math.min(3 + Math.floor(level / 10) * 2, 9);
+            const bossX = levelWidth / 2;
+            boss = {
+                x: bossX,
+                y: h - 80,
+                width: 50,
+                height: 45,
+                hp: bossHp,
+                maxHp: bossHp,
+                vx: 1.3 + (level * 0.015),
+                minX: bossX - 180,
+                maxX: bossX + 180,
+                shootTimer: 0,
+                isDefeated: false
+            };
+        }
+
+        // Powerups Placement
         if (level % 2 === 0 || level > 25) {
-            const pPlat = platforms[1];
             const pType = level % 3 === 0 ? 'shield' : (level % 3 === 1 ? 'magnet' : 'boost');
             powerups.push({
-                x: pPlat.x + pPlat.width / 2,
-                y: pPlat.y - 30,
+                x: levelWidth * 0.35,
+                y: h - 90,
                 type: pType,
                 collected: false,
                 radius: 10
             });
         }
 
+        // Checkpoint Setup (Middle of level)
         let checkpoint = null;
-        if (level >= 4 && level % 3 === 0 && !isBossLevel) {
-            const midP = platforms[Math.floor(platforms.length / 2)];
+        if (level >= 4 && !isBossLevel) {
             checkpoint = {
-                x: midP.x + midP.width / 2 - 9,
-                y: midP.y - 30,
+                x: levelWidth * 0.45,
+                y: h - 60,
                 width: 18,
                 height: 30,
                 active: false
             };
         }
 
-        const highestPlat = platforms[platforms.length - 1];
-        const keyPlat = platforms[Math.floor(platforms.length / 2)];
-
+        // Key Item Setup (Mid-Late level)
         const keyItem = {
-            x: keyPlat.x + keyPlat.width / 2 - 10,
-            y: keyPlat.y - 25,
+            x: levelWidth * 0.6,
+            y: h - 90,
             width: 20,
             height: 20,
             collected: false
         };
 
+        // Goal Portal Setup (End of level far right)
         const goal = {
-            x: highestPlat.x + highestPlat.width / 2 - 15,
-            y: highestPlat.y - 40,
+            x: levelWidth - 80,
+            y: h - 70,
             width: 30,
             height: 40,
             isLocked: true
@@ -440,8 +464,10 @@ class PlatformerGame {
             theme,
             targetTime,
             lavaSpeed,
+            levelWidth,
             checkpoint,
             platforms,
+            grappleNodes,
             coins,
             spikes,
             springs: [],
@@ -459,7 +485,7 @@ class PlatformerGame {
         const h = this.canvas.height || 400;
 
         this.levelTime = 0;
-        this.cameraY = 0;
+        this.cameraX = 0;
         this.particles = [];
         this.weatherParticles = [];
         this.floatingTexts = [];
@@ -467,7 +493,6 @@ class PlatformerGame {
         this.comboCount = 0;
         this.comboTimer = 0;
 
-        // Initialize Ambient Weather Particles
         for (let i = 0; i < 20; i++) {
             this.weatherParticles.push({
                 x: Math.random() * w,
@@ -491,7 +516,8 @@ class PlatformerGame {
         this.isGameCleared = false;
         const levelData = this.getLevelData(currentLevel, w, h);
 
-        this.spawnPoint = { x: 25, y: h - 140 };
+        this.levelWidth = levelData.levelWidth;
+        this.spawnPoint = { x: 50, y: h - 100 };
 
         const state = store.getState();
         const dashCooldownBase = Math.max(15, 30 - (state.upgrades?.dashLevel || 0) * 4);
@@ -503,7 +529,6 @@ class PlatformerGame {
             height: 36,
             vx: 0,
             vy: 0,
-            // ปรับลดความเร็วการเดินและความแรงกระโดดให้รับกับแรงโน้มถ่วงใหม่
             speed: 4.0,
             jumpPower: -6.8,
             isGrounded: false,
@@ -514,6 +539,15 @@ class PlatformerGame {
             dashTimer: 0,
             dashCooldown: 0,
             maxDashCooldown: dashCooldownBase,
+            dashDirX: 1,
+            dashDirY: 0,
+
+            // Mechanics States
+            isGroundPounding: false,
+            isGrappling: false,
+            grappleNode: null,
+            grappleLength: 0,
+
             isWallSliding: false,
             coyoteTimer: 0,
             jumpBufferTimer: 0,
@@ -538,6 +572,7 @@ class PlatformerGame {
         this.targetTime = levelData.targetTime;
         this.checkpoint = levelData.checkpoint;
         this.platforms = levelData.platforms;
+        this.grappleNodes = levelData.grappleNodes || [];
         this.coins = levelData.coins;
         this.spikes = levelData.spikes;
         this.springs = levelData.springs;
@@ -547,8 +582,9 @@ class PlatformerGame {
         this.keyItem = levelData.keyItem;
         this.goal = levelData.goal;
 
+        // Lava Chaser Wall (Chases horizontally from behind)
         this.lava = {
-            y: h + 120,
+            x: -250,
             speed: levelData.lavaSpeed
         };
     }
@@ -559,6 +595,8 @@ class PlatformerGame {
         p.y = this.spawnPoint.y;
         p.vx = 0;
         p.vy = -5.5;
+        p.isGroundPounding = false;
+        p.isGrappling = false;
         p.invincibleTimer = 60;
         p.hasShield = true;
         this.triggerShake(10, 15);
@@ -591,31 +629,48 @@ class PlatformerGame {
 
         bindBtn('btn-left', 'left');
         bindBtn('btn-right', 'right');
+        bindBtn('btn-down', 'down', () => this.handleGroundPoundTrigger());
         bindBtn('btn-jump', 'jump', () => this.handleJumpTrigger());
         bindBtn('btn-dash', 'dash', () => this.handleDashTrigger());
+        bindBtn('btn-grapple', 'grapple', () => this.handleGrappleToggle());
     }
 
     setupKeyboardControls() {
         window.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft' || e.key === 'a') this.keys.left = true;
             if (e.key === 'ArrowRight' || e.key === 'd') this.keys.right = true;
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') {
+            if (e.key === 'ArrowUp' || e.key === 'w') this.keys.up = true;
+            if (e.key === 'ArrowDown' || e.key === 's') {
+                this.keys.down = true;
+                this.handleGroundPoundTrigger();
+            }
+            if (e.key === ' ') {
                 if (!this.keys.jump) this.handleJumpTrigger();
                 this.keys.jump = true;
             }
             if (e.key === 'Shift' || e.key === 'k') this.handleDashTrigger();
+            if (e.key === 'e' || e.key === 'E') this.handleGrappleToggle();
         });
 
         window.addEventListener('keyup', (e) => {
             if (e.key === 'ArrowLeft' || e.key === 'a') this.keys.left = false;
             if (e.key === 'ArrowRight' || e.key === 'd') this.keys.right = false;
-            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') this.keys.jump = false;
+            if (e.key === 'ArrowUp' || e.key === 'w') this.keys.up = false;
+            if (e.key === 'ArrowDown' || e.key === 's') this.keys.down = false;
+            if (e.key === ' ') this.keys.jump = false;
         });
     }
 
     tryExecuteJump() {
         const p = this.player;
         if (!p) return false;
+
+        if (p.isGrappling) {
+            p.isGrappling = false;
+            p.vy = p.jumpPower * 1.1;
+            this.sfx.playJump();
+            return true;
+        }
 
         if (p.isGrounded || p.coyoteTimer > 0) {
             p.vy = p.jumpPower;
@@ -650,13 +705,76 @@ class PlatformerGame {
         this.tryExecuteJump();
     }
 
+    handleGroundPoundTrigger() {
+        const p = this.player;
+        if (!p || p.isGrounded || p.isGroundPounding) return;
+        p.isGroundPounding = true;
+        p.isDashing = false;
+        p.isGrappling = false;
+        p.vx = 0;
+        p.vy = 12.0;
+        this.sfx.playDash();
+        this.addParticles(p.x + p.width / 2, p.y, '#ef4444', 12);
+        this.addFloatingText(p.x - 10, p.y - 15, '💥 GROUND POUND!', '#ef4444');
+    }
+
+    handleGrappleToggle() {
+        const p = this.player;
+        if (!p) return;
+
+        if (p.isGrappling) {
+            p.isGrappling = false;
+            return;
+        }
+
+        // Find nearest Grapple Node in Range
+        let closest = null;
+        let minDist = 180;
+        const px = p.x + p.width / 2;
+        const py = p.y + p.height / 2;
+
+        this.grappleNodes.forEach(node => {
+            const dist = Math.hypot(node.x - px, node.y - py);
+            if (dist < minDist) {
+                minDist = dist;
+                closest = node;
+            }
+        });
+
+        if (closest) {
+            p.isGrappling = true;
+            p.grappleNode = closest;
+            p.grappleLength = minDist;
+            this.sfx.playCheckpoint();
+            this.addParticles(closest.x, closest.y, '#38bdf8', 10);
+        }
+    }
+
     handleDashTrigger() {
         if (this.isGameCleared) return;
         const p = this.player;
         if (p.dashCooldown <= 0 && !p.isDashing) {
+            let dx = 0;
+            let dy = 0;
+
+            if (this.keys.left) dx -= 1;
+            if (this.keys.right) dx += 1;
+            if (this.keys.up) dy -= 1;
+            if (this.keys.down) dy += 1;
+
+            if (dx === 0 && dy === 0) {
+                dx = p.facing === 'right' ? 1 : -1;
+            }
+
+            const len = Math.hypot(dx, dy);
+            p.dashDirX = dx / len;
+            p.dashDirY = dy / len;
+
             p.isDashing = true;
+            p.isGroundPounding = false;
             p.dashTimer = 10;
             p.dashCooldown = p.maxDashCooldown || 30;
+
             this.sfx.playDash();
             this.triggerShake(5, 8);
             this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#facc15', 14);
@@ -667,8 +785,11 @@ class PlatformerGame {
         if (tab !== 'game') {
             this.keys.left = false;
             this.keys.right = false;
+            this.keys.up = false;
+            this.keys.down = false;
             this.keys.jump = false;
             this.keys.dash = false;
+            this.keys.grapple = false;
         }
         this.updateBGMState();
     }
@@ -714,16 +835,16 @@ class PlatformerGame {
         }
 
         const p = this.player;
-
         this.levelTime++;
 
-        // Smooth Camera Tracking (Lerp Y-Axis)
-        const targetCamY = Math.min(0, p.y - this.canvas.height * 0.45);
-        this.cameraY += (targetCamY - this.cameraY) * 0.1;
+        // Smooth Horizontal Camera Tracking (Lerp X-Axis)
+        const targetCamX = Math.max(0, p.x - this.canvas.width * 0.3);
+        this.cameraX += (targetCamX - this.cameraX) * 0.1;
 
+        // Lava Wall Chaser Alert
         if (this.lava) {
-            const lavaDist = this.lava.y - (p.y + p.height);
-            if (lavaDist < 110) {
+            const lavaDist = p.x - this.lava.x;
+            if (lavaDist < 180) {
                 if (this.bgm) this.bgm.playbackRate = 1.25;
                 this.isLavaNear = true;
             } else {
@@ -734,9 +855,7 @@ class PlatformerGame {
 
         if (this.comboTimer > 0) {
             this.comboTimer--;
-            if (this.comboTimer <= 0) {
-                this.comboCount = 0;
-            }
+            if (this.comboTimer <= 0) this.comboCount = 0;
         }
 
         if (p.invincibleTimer > 0) p.invincibleTimer--;
@@ -756,7 +875,7 @@ class PlatformerGame {
             p.coyoteTimer--;
         }
 
-        // Update Weather Particles
+        // Weather Particles
         this.weatherParticles.forEach(wp => {
             if (this.currentTheme === 'volcano') {
                 wp.y -= wp.vy * 1.5;
@@ -769,7 +888,7 @@ class PlatformerGame {
             }
         });
 
-        // Update Standard Particles
+        // Particles
         this.particles.forEach(pt => {
             pt.x += pt.vx;
             pt.y += pt.vy;
@@ -778,7 +897,7 @@ class PlatformerGame {
         });
         this.particles = this.particles.filter(pt => pt.life > 0 && pt.alpha > 0);
 
-        // Update Floating Text
+        // Floating Text
         this.floatingTexts.forEach(ft => {
             ft.y += ft.vy;
             ft.alpha -= 0.02;
@@ -801,10 +920,10 @@ class PlatformerGame {
             }
         }
 
-        // Lava Rise Logic
+        // Lava Wall Horizontal Movement & Catch Up
         if (this.lava) {
-            this.lava.y -= this.lava.speed;
-            if (p.y + p.height > this.lava.y) {
+            this.lava.x += this.lava.speed;
+            if (p.x < this.lava.x) {
                 this.handlePlayerDamage();
             }
         }
@@ -814,9 +933,37 @@ class PlatformerGame {
 
         const currentSpeed = p.boostTimer > 0 ? p.speed * 1.5 : p.speed;
 
-        if (p.isDashing) {
-            p.vx = p.facing === 'right' ? currentSpeed * 2.4 : -currentSpeed * 2.4;
-            p.vy = 0;
+        // Grappling Hook Physics
+        if (p.isGrappling && p.grappleNode) {
+            const gx = p.grappleNode.x;
+            const gy = p.grappleNode.y;
+            const px = p.x + p.width / 2;
+            const py = p.y + p.height / 2;
+
+            const dx = px - gx;
+            const dy = py - gy;
+            const currentDist = Math.hypot(dx, dy);
+
+            p.vy += this.GRAVITY;
+
+            if (currentDist > p.grappleLength) {
+                const angle = Math.atan2(dy, dx);
+                p.x = gx + Math.cos(angle) * p.grappleLength - p.width / 2;
+                p.y = gy + Math.sin(angle) * p.grappleLength - p.height / 2;
+
+                const tension = 0.12;
+                p.vx -= Math.cos(angle) * tension;
+            }
+
+            if (this.keys.left) p.vx -= 0.15;
+            if (this.keys.right) p.vx += 0.15;
+        }
+        else if (p.isGroundPounding) {
+            p.vx = 0;
+            p.vy = 14.0;
+        } else if (p.isDashing) {
+            p.vx = p.dashDirX * currentSpeed * 2.5;
+            p.vy = p.dashDirY * currentSpeed * 2.5;
             p.dashTimer--;
             if (p.dashTimer <= 0) p.isDashing = false;
         } else {
@@ -837,33 +984,21 @@ class PlatformerGame {
         p.x += p.vx;
         p.y += p.vy;
 
-        // Enhanced Trail FX
-        if (p.vx !== 0 || p.vy !== 0 || p.isDashing) {
+        // Trail FX
+        if (p.vx !== 0 || p.vy !== 0 || p.isDashing || p.isGroundPounding) {
             p.trail.push({
                 x: p.x + p.width / 2,
                 y: p.y + p.height / 2,
                 alpha: 0.6,
-                color: state.selectedSkin === 'electric' ? '#38bdf8' : (state.selectedSkin === 'gold' ? '#facc15' : '#ef4444')
+                color: p.isGroundPounding ? '#ef4444' : (state.selectedSkin === 'electric' ? '#38bdf8' : (state.selectedSkin === 'gold' ? '#facc15' : '#ef4444'))
             });
         }
         p.trail.forEach(t => t.alpha -= 0.05);
         p.trail = p.trail.filter(t => t.alpha > 0);
 
-        p.isWallSliding = false;
-        if (!p.isGrounded && p.vy > 0) {
-            if (p.x <= 0 && this.keys.left) {
-                p.isWallSliding = true;
-                p.vy = 1.3;
-            } else if (p.x + p.width >= this.canvas.width && this.keys.right) {
-                p.isWallSliding = true;
-                p.vy = 1.3;
-            }
-        }
-
         if (p.x < 0) p.x = 0;
-        if (p.x + p.width > this.canvas.width) p.x = this.canvas.width - p.width;
 
-        // Platforms Mechanics
+        // Platform Mechanics & Collision
         p.isGrounded = false;
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) {
@@ -899,6 +1034,22 @@ class PlatformerGame {
                 p.y + p.height <= plat.y + plat.height + p.vy &&
                 p.vy >= 0
             ) {
+                if (p.isGroundPounding) {
+                    p.isGroundPounding = false;
+                    this.triggerShake(14, 18);
+                    this.sfx.playHit();
+                    this.addParticles(p.x + p.width / 2, plat.y, '#ef4444', 25);
+                    this.addFloatingText(p.x - 20, plat.y - 20, 'SHOCKWAVE!', '#ef4444');
+
+                    this.enemies.forEach(enemy => {
+                        if (!enemy.isDefeated && Math.abs((enemy.x + enemy.width / 2) - (p.x + p.width / 2)) < 110) {
+                            enemy.isDefeated = true;
+                            store.addScore(75);
+                            this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 15);
+                        }
+                    });
+                }
+
                 if (plat.type === 'bounce') {
                     p.vy = -11.5;
                     p.isGrounded = false;
@@ -939,7 +1090,7 @@ class PlatformerGame {
             }
         });
 
-        // BOSS Combat Logic
+        // BOSS Combat
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             b.x += b.vx;
@@ -953,11 +1104,11 @@ class PlatformerGame {
                 this.projectiles.push({
                     x: b.x + b.width / 2,
                     y: b.y + b.height / 2,
-                    // ปรับลดความเร็วกระสุนบอส
                     vx: (p.x < b.x) ? -2.6 : 2.6,
                     vy: -1.0,
                     radius: 7,
-                    color: '#f97316'
+                    color: '#f97316',
+                    isParried: false
                 });
             }
 
@@ -992,7 +1143,7 @@ class PlatformerGame {
             }
         }
 
-        // Enemies & Projectiles
+        // Enemies & Projectiles Logic
         this.enemies.forEach(enemy => {
             if (enemy.isDefeated) return;
 
@@ -1008,11 +1159,11 @@ class PlatformerGame {
                     this.projectiles.push({
                         x: enemy.x + enemy.width / 2,
                         y: enemy.y + enemy.height / 2,
-                        // ปรับลดความเร็วกระสุนศัตรู
                         vx: -2.5,
                         vy: 0,
                         radius: 5,
-                        color: '#ef4444'
+                        color: '#ef4444',
+                        isParried: false
                     });
                 }
             }
@@ -1040,19 +1191,33 @@ class PlatformerGame {
             }
         });
 
-        // Projectiles Update
+        // Projectiles Collision & PARRY Check
         this.projectiles.forEach(pj => {
             pj.x += pj.vx;
             pj.y += pj.vy;
 
             const dx = (p.x + p.width / 2) - pj.x;
             const dy = (p.y + p.height / 2) - pj.y;
-            if (Math.sqrt(dx * dx + dy * dy) < pj.radius + p.width / 2.5) {
+            const dist = Math.hypot(dx, dy);
+
+            if (p.isDashing && p.dashTimer > 5 && dist < pj.radius + p.width / 1.8 && !pj.isParried) {
+                pj.isParried = true;
+                pj.vx *= -1.8;
+                pj.vy *= -1.8;
+                pj.color = '#38bdf8';
+                this.sfx.playCheckpoint();
+                this.triggerShake(8, 10);
+                this.addParticles(pj.x, pj.y, '#38bdf8', 16);
+                this.addFloatingText(pj.x, pj.y - 15, '🛡️ PARRY!', '#38bdf8');
+                return;
+            }
+
+            if (!pj.isParried && dist < pj.radius + p.width / 2.5) {
                 pj.hit = true;
                 this.handlePlayerDamage();
             }
         });
-        this.projectiles = this.projectiles.filter(pj => !pj.hit && pj.x > -20 && pj.x < this.canvas.width + 20);
+        this.projectiles = this.projectiles.filter(pj => !pj.hit && pj.x > this.cameraX - 50 && pj.x < this.cameraX + this.canvas.width + 50);
 
         // Key Collection
         if (this.keyItem && !this.keyItem.collected) {
@@ -1072,12 +1237,12 @@ class PlatformerGame {
             }
         }
 
-        // Power-ups Collection
+        // Power-ups
         this.powerups.forEach(pw => {
             if (!pw.collected) {
                 const dx = (p.x + p.width / 2) - pw.x;
                 const dy = (p.y + p.height / 2) - pw.y;
-                if (Math.sqrt(dx * dx + dy * dy) < pw.radius + p.width / 2) {
+                if (Math.hypot(dx, dy) < pw.radius + p.width / 2) {
                     pw.collected = true;
                     if (pw.type === 'shield') p.hasShield = true;
                     if (pw.type === 'magnet') p.magnetTimer = 300;
@@ -1096,7 +1261,7 @@ class PlatformerGame {
             if (!coin.collected) {
                 const dx = (p.x + p.width / 2) - coin.x;
                 const dy = (p.y + p.height / 2) - coin.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dist = Math.hypot(dx, dy);
 
                 if (magnetDist > 0 && dist < magnetDist) {
                     coin.x += (dx / dist) * -3.8;
@@ -1134,7 +1299,7 @@ class PlatformerGame {
             }
         });
 
-        // Goal Collision
+        // Goal Collision (Level End Portal)
         if (
             this.goal &&
             !this.goal.isLocked &&
@@ -1164,7 +1329,7 @@ class PlatformerGame {
             this.resetEntities();
         }
 
-        // Fall Off Condition
+        // Pitfall Condition (Fell into gap)
         if (p.y > this.canvas.height + 40) {
             this.handlePlayerDamage();
         }
@@ -1193,6 +1358,7 @@ class PlatformerGame {
         const w = this.canvas.width;
         const h = this.canvas.height;
         const time = this.levelTime * 0.02;
+        const parallaxX = this.cameraX * 0.2;
 
         if (this.currentTheme === 'volcano') {
             const caveGrad = this.ctx.createLinearGradient(0, 0, 0, h);
@@ -1206,25 +1372,19 @@ class PlatformerGame {
             this.ctx.beginPath();
             this.ctx.moveTo(0, h);
             for (let x = 0; x <= w; x += 20) {
-                const y = h - 120 - Math.sin(x * 0.01) * 40 - Math.cos(x * 0.02) * 20;
+                const worldX = x + parallaxX;
+                const y = h - 120 - Math.sin(worldX * 0.01) * 40 - Math.cos(worldX * 0.02) * 20;
                 this.ctx.lineTo(x, y);
             }
             this.ctx.lineTo(w, h);
             this.ctx.fill();
 
-            // Volcano Embers
             this.weatherParticles.forEach(wp => {
                 this.ctx.fillStyle = `rgba(249, 115, 22, ${wp.alpha})`;
                 this.ctx.beginPath();
                 this.ctx.arc(wp.x, wp.y, wp.size, 0, Math.PI * 2);
                 this.ctx.fill();
             });
-
-            const glowGrad = this.ctx.createRadialGradient(w / 2, h, 20, w / 2, h, h * 0.85);
-            glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.45)');
-            glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            this.ctx.fillStyle = glowGrad;
-            this.ctx.fillRect(0, 0, w, h);
 
         } else if (this.currentTheme === 'night') {
             const nightGrad = this.ctx.createLinearGradient(0, 0, 0, h);
@@ -1236,18 +1396,11 @@ class PlatformerGame {
 
             const moonX = w * 0.82;
             const moonY = 65;
-            const moonGlow = this.ctx.createRadialGradient(moonX, moonY, 15, moonX, moonY, 60);
-            moonGlow.addColorStop(0, 'rgba(224, 231, 255, 0.7)');
-            moonGlow.addColorStop(1, 'rgba(224, 231, 255, 0)');
-            this.ctx.fillStyle = moonGlow;
-            this.ctx.fillRect(moonX - 60, moonY - 60, 120, 120);
-
             this.ctx.fillStyle = '#f8fafc';
             this.ctx.beginPath();
             this.ctx.arc(moonX, moonY, 22, 0, Math.PI * 2);
             this.ctx.fill();
 
-            // Twinkling Ambient Dust/Stars
             this.weatherParticles.forEach(wp => {
                 this.ctx.fillStyle = `rgba(224, 231, 255, ${wp.alpha * (Math.sin(time * 2 + wp.x) * 0.3 + 0.7)})`;
                 this.ctx.beginPath();
@@ -1259,7 +1412,8 @@ class PlatformerGame {
             this.ctx.beginPath();
             this.ctx.moveTo(0, h);
             for (let x = 0; x <= w; x += 15) {
-                const y = h - 100 - Math.sin(x * 0.015 + 1) * 35;
+                const worldX = x + parallaxX;
+                const y = h - 100 - Math.sin(worldX * 0.015 + 1) * 35;
                 this.ctx.lineTo(x, y);
             }
             this.ctx.lineTo(w, h);
@@ -1274,9 +1428,9 @@ class PlatformerGame {
             this.ctx.fillRect(0, 0, w, h);
 
             const clouds = [
-                { x: (w * 0.12 + time * 15) % (w + 100) - 50, y: 70, scale: 0.85 },
-                { x: (w * 0.48 + time * 10) % (w + 120) - 60, y: 115, scale: 1.1 },
-                { x: (w * 0.78 + time * 20) % (w + 80) - 40, y: 140, scale: 0.75 }
+                { x: (w * 0.12 + time * 15 - parallaxX) % (w + 200) - 100, y: 70, scale: 0.85 },
+                { x: (w * 0.48 + time * 10 - parallaxX) % (w + 220) - 110, y: 115, scale: 1.1 },
+                { x: (w * 0.78 + time * 20 - parallaxX) % (w + 180) - 90, y: 140, scale: 0.75 }
             ];
 
             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
@@ -1310,7 +1464,7 @@ class PlatformerGame {
             return;
         }
 
-        // 2. Apply Camera & Screen Shake
+        // 2. Apply Camera & Screen Shake (Horizontal Offset)
         this.ctx.save();
 
         if (this.shakeTimer > 0) {
@@ -1319,7 +1473,31 @@ class PlatformerGame {
             this.ctx.translate(rx, ry);
         }
 
-        this.ctx.translate(0, -this.cameraY);
+        this.ctx.translate(-this.cameraX, 0);
+
+        // Render Grapple Nodes
+        this.grappleNodes.forEach(node => {
+            this.ctx.save();
+            this.ctx.beginPath();
+            this.ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+            this.ctx.fillStyle = '#38bdf8';
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = '#38bdf8';
+            this.ctx.fill();
+            this.ctx.restore();
+        });
+
+        const p = this.player;
+        if (p.isGrappling && p.grappleNode) {
+            this.ctx.save();
+            this.ctx.strokeStyle = '#38bdf8';
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.moveTo(p.x + p.width / 2, p.y + p.height / 2);
+            this.ctx.lineTo(p.grappleNode.x, p.grappleNode.y);
+            this.ctx.stroke();
+            this.ctx.restore();
+        }
 
         // Render Particles
         this.particles.forEach(pt => {
@@ -1332,7 +1510,6 @@ class PlatformerGame {
         });
 
         // Trail FX
-        const p = this.player;
         p.trail.forEach(t => {
             this.ctx.beginPath();
             this.ctx.arc(t.x, t.y, 12 * t.alpha, 0, Math.PI * 2);
@@ -1354,27 +1531,26 @@ class PlatformerGame {
             this.ctx.fill();
         }
 
-        // Render Lava with Visual Polish
+        // Render Lava Chaser Wall (Vertical wall coming from left)
         if (this.lava) {
             this.ctx.save();
             this.ctx.shadowBlur = 20;
             this.ctx.shadowColor = '#f97316';
 
-            const lavaGrad = this.ctx.createLinearGradient(0, this.lava.y, 0, this.canvas.height);
-            lavaGrad.addColorStop(0, '#f97316');
-            lavaGrad.addColorStop(0.3, '#ea580c');
-            lavaGrad.addColorStop(1, '#991b1b');
+            const lavaGrad = this.ctx.createLinearGradient(this.lava.x - 300, 0, this.lava.x, 0);
+            lavaGrad.addColorStop(0, '#991b1b');
+            lavaGrad.addColorStop(0.7, '#ea580c');
+            lavaGrad.addColorStop(1, '#f97316');
             this.ctx.fillStyle = lavaGrad;
 
             this.ctx.beginPath();
-            this.ctx.moveTo(0, this.lava.y);
+            this.ctx.moveTo(this.lava.x - 500, 0);
 
-            for (let x = 0; x <= this.canvas.width; x += 8) {
-                const waveY = this.lava.y + Math.sin((x + this.levelTime * 4) * 0.04) * 5;
-                this.ctx.lineTo(x, waveY);
+            for (let y = 0; y <= this.canvas.height; y += 10) {
+                const waveX = this.lava.x + Math.sin((y + this.levelTime * 4) * 0.04) * 6;
+                this.ctx.lineTo(waveX, y);
             }
-            this.ctx.lineTo(this.canvas.width, this.canvas.height + 800);
-            this.ctx.lineTo(0, this.canvas.height + 800);
+            this.ctx.lineTo(this.lava.x - 500, this.canvas.height);
             this.ctx.closePath();
             this.ctx.fill();
 
@@ -1384,7 +1560,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Goal
+        // Render Goal Portal
         if (this.goal) {
             this.ctx.save();
             const isLocked = this.goal.isLocked;
@@ -1425,7 +1601,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Platforms with Polished Highlights
+        // Render Platforms
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
             if (plat.type === 'phase' && !plat.active) return;
@@ -1664,10 +1840,10 @@ class PlatformerGame {
             }
         });
 
-        // Render Player with Dynamic Skin Aura & Shadows
+        // Render Player
         if (this.playerImg.complete && this.playerImg.naturalWidth !== 0) {
             if (p.invincibleTimer > 0 && Math.floor(p.invincibleTimer / 4) % 2 === 0) {
-                // Flash when invincible
+                // Invincibility flashing state
             } else {
                 this.ctx.save();
                 const feetX = p.x + p.width / 2;
@@ -1684,7 +1860,6 @@ class PlatformerGame {
                 const renderW = p.width * 2.0;
                 const renderH = p.height * 2.0;
 
-                // Skin-Specific Dynamic Glow Aura
                 const skin = store.getState().selectedSkin;
                 const auraColor = skin === 'electric' ? '#38bdf8' : (skin === 'gold' ? '#facc15' : '#ef4444');
                 this.ctx.shadowBlur = 14;
@@ -1736,7 +1911,7 @@ class PlatformerGame {
             this.ctx.fillText(`🔥 COMBO x${currentMult} (${this.comboCount})`, 12, 55);
         }
 
-        // Lava Warning Red Vignette Overlay
+        // Lava Warning Vignette Overlay
         if (this.isLavaNear) {
             this.ctx.fillStyle = `rgba(239, 68, 68, ${0.15 + Math.sin(this.levelTime * 0.2) * 0.1})`;
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -1744,7 +1919,7 @@ class PlatformerGame {
             this.ctx.fillStyle = '#ef4444';
             this.ctx.font = 'bold 14px sans-serif';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText('⚠️ ระวังลาวา!', this.canvas.width / 2, 25);
+            this.ctx.fillText('⚠️ ระวังกำแพงลาวาไล่หลัง!', this.canvas.width / 2, 25);
             this.ctx.textAlign = 'left';
         }
 
