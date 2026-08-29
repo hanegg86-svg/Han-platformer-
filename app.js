@@ -101,23 +101,15 @@ class PlatformerGame {
         this.ui = new UIManager();
         this.sfx = new SoundFX();
         
-        // Extended Controls
-        this.keys = { left: false, right: false, up: false, down: false, jump: false, dash: false, grapple: false };
+        // Controls (Removed Grapple)
+        this.keys = { left: false, right: false, up: false, down: false, jump: false, dash: false };
         this.animationFrameId = null;
 
-        // BGM Setup
+        // BGM
         this.bgm = new Audio('bgm.mp3');
         this.bgm.loop = true;
 
-        // Player Single Image Setup
-        this.playerImg = new Image();
-        this.playerImg.src = 'player.png';
-
-        // Enemy Single Image Setup
-        this.enemyImg = new Image();
-        this.enemyImg.src = 'enemy.png';
-
-        // Physics Constants
+        // Physics
         this.GRAVITY = 0.32;
         
         // Game Entities
@@ -131,17 +123,16 @@ class PlatformerGame {
         this.enemies = [];
         this.boss = null;
         this.projectiles = [];
-        this.grappleNodes = [];
         this.checkpoint = null;
         this.spawnPoint = { x: 50, y: 0 };
         this.lava = null;
         this.keyItem = null;
         this.goal = null;
 
-        // Camera System (Horizontal)
+        // Camera System
         this.cameraX = 0;
 
-        // Visual Polish System
+        // Visual FX
         this.particles = [];
         this.weatherParticles = [];
         this.floatingTexts = [];
@@ -149,17 +140,13 @@ class PlatformerGame {
         this.shakeIntensity = 0;
         this.hitFreezeTimer = 0;
 
-        // Combo Multiplier System
+        // Combo System
         this.comboCount = 0;
         this.comboTimer = 0;
 
-        // Dynamic BGM State
         this.isLavaNear = false;
-
-        // Visual Theme State ('grass', 'yoyle', 'volcano')
         this.currentTheme = 'grass';
 
-        // Timers & Banners
         this.levelTime = 0;
         this.targetTime = 15;
         this.bannerTimer = 0;
@@ -182,7 +169,6 @@ class PlatformerGame {
         this.setupTouchControls();
         this.setupKeyboardControls();
 
-        // Unlock Audio Autoplay on First Interaction
         const unlockAudio = () => {
             this.sfx.init();
             this.updateBGMState();
@@ -274,10 +260,8 @@ class PlatformerGame {
         const spikes = [];
         const enemies = [];
         const powerups = [];
-        const grappleNodes = [];
         let boss = null;
 
-        // Ground generation with clean BFDI cartoon layout
         let currX = 0;
         platforms.push({ x: 0, y: h - 35, width: 320, height: 35, type: 'normal' });
         currX = 320;
@@ -323,7 +307,6 @@ class PlatformerGame {
 
             platforms.push(platObj);
 
-            // Upper floating platform (Clean clearance)
             let hasUpperPlat = false;
             let floatY = 0;
             let floatWidth = 0;
@@ -339,20 +322,11 @@ class PlatformerGame {
                     type: 'normal'
                 });
 
-                // Win Tokens (BFDI Coins)
                 coins.push({
                     x: currX + platWidth / 2,
                     y: floatY - 22,
                     radius: 9,
                     collected: false
-                });
-            }
-
-            if (gapWidth > 85 && level >= 3 && !isBossLevel) {
-                grappleNodes.push({
-                    x: currX - gapWidth / 2,
-                    y: platY - 110,
-                    radius: 12
                 });
             }
 
@@ -461,7 +435,6 @@ class PlatformerGame {
             levelWidth,
             checkpoint,
             platforms,
-            grappleNodes,
             coins,
             spikes,
             springs: [],
@@ -519,16 +492,14 @@ class PlatformerGame {
         this.player = {
             x: this.spawnPoint.x,
             y: this.spawnPoint.y,
-            width: 36,
-            height: 36,
+            width: 38,
+            height: 42,
             vx: 0,
             vy: 0,
             speed: 4.0,
             jumpPower: -6.8,
             isGrounded: false,
-            color: '#ef4444',
             
-            // Lives
             lives: 3,
             maxLives: 3,
 
@@ -541,10 +512,6 @@ class PlatformerGame {
             dashDirY: 0,
 
             isGroundPounding: false,
-            isGrappling: false,
-            grappleNode: null,
-            grappleLength: 0,
-
             isWallSliding: false,
             coyoteTimer: 0,
             jumpBufferTimer: 0,
@@ -569,7 +536,6 @@ class PlatformerGame {
         this.targetTime = levelData.targetTime;
         this.checkpoint = levelData.checkpoint;
         this.platforms = levelData.platforms;
-        this.grappleNodes = levelData.grappleNodes || [];
         this.coins = levelData.coins;
         this.spikes = levelData.spikes;
         this.springs = levelData.springs;
@@ -592,12 +558,11 @@ class PlatformerGame {
         p.vx = 0;
         p.vy = -5.5;
         p.isGroundPounding = false;
-        p.isGrappling = false;
         p.invincibleTimer = 75;
         p.hasShield = true;
         this.triggerShake(10, 15);
         this.sfx.playHit();
-        this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 20);
+        this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#f97316', 20);
     }
 
     setupTouchControls() {
@@ -627,7 +592,6 @@ class PlatformerGame {
         bindBtn('btn-right', 'right');
         bindBtn('btn-jump', 'jump', () => this.handleJumpTrigger());
         bindBtn('btn-dash', 'dash', () => this.handleDashTrigger());
-        bindBtn('btn-grapple', 'grapple', () => this.handleGrappleToggle());
     }
 
     setupKeyboardControls() {
@@ -644,7 +608,6 @@ class PlatformerGame {
                 this.keys.jump = true;
             }
             if (e.key === 'Shift' || e.key === 'k') this.handleDashTrigger();
-            if (e.key === 'e' || e.key === 'E') this.handleGrappleToggle();
         });
 
         window.addEventListener('keyup', (e) => {
@@ -660,13 +623,6 @@ class PlatformerGame {
         const p = this.player;
         if (!p) return false;
 
-        if (p.isGrappling) {
-            p.isGrappling = false;
-            p.vy = p.jumpPower * 1.1;
-            this.sfx.playJump();
-            return true;
-        }
-
         if (p.isGrounded || p.coyoteTimer > 0) {
             p.vy = p.jumpPower;
             p.isGrounded = false;
@@ -674,21 +630,14 @@ class PlatformerGame {
             p.jumpBufferTimer = 0;
             p.jumpsLeft = 1;
             this.sfx.playJump();
-            this.addParticles(p.x + p.width / 2, p.y + p.height, '#ffffff', 8);
-            return true;
-        } else if (p.isWallSliding) {
-            p.vy = p.jumpPower;
-            p.vx = p.facing === 'left' ? p.speed : -p.speed;
-            p.isWallSliding = false;
-            p.jumpBufferTimer = 0;
-            this.sfx.playJump();
+            this.addParticles(p.x + p.width / 2, p.y + p.height, '#facc15', 8);
             return true;
         } else if (p.jumpsLeft > 0) {
             p.vy = p.jumpPower * 0.9;
             p.jumpsLeft--;
             p.jumpBufferTimer = 0;
             this.sfx.playJump();
-            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 10);
+            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#f97316', 10);
             return true;
         }
         return false;
@@ -705,43 +654,11 @@ class PlatformerGame {
         if (!p || p.isGrounded || p.isGroundPounding) return;
         p.isGroundPounding = true;
         p.isDashing = false;
-        p.isGrappling = false;
         p.vx = 0;
         p.vy = 12.0;
         this.sfx.playDash();
         this.addParticles(p.x + p.width / 2, p.y, '#ef4444', 12);
         this.addFloatingText(p.x - 10, p.y - 15, '💥 GROUND POUND!', '#ef4444');
-    }
-
-    handleGrappleToggle() {
-        const p = this.player;
-        if (!p) return;
-
-        if (p.isGrappling) {
-            p.isGrappling = false;
-            return;
-        }
-
-        let closest = null;
-        let minDist = 180;
-        const px = p.x + p.width / 2;
-        const py = p.y + p.height / 2;
-
-        this.grappleNodes.forEach(node => {
-            const dist = Math.hypot(node.x - px, node.y - py);
-            if (dist < minDist) {
-                minDist = dist;
-                closest = node;
-            }
-        });
-
-        if (closest) {
-            p.isGrappling = true;
-            p.grappleNode = closest;
-            p.grappleLength = minDist;
-            this.sfx.playCheckpoint();
-            this.addParticles(closest.x, closest.y, '#38bdf8', 10);
-        }
     }
 
     handleDashTrigger() {
@@ -783,7 +700,6 @@ class PlatformerGame {
             this.keys.down = false;
             this.keys.jump = false;
             this.keys.dash = false;
-            this.keys.grapple = false;
         }
         this.updateBGMState();
     }
@@ -927,31 +843,7 @@ class PlatformerGame {
 
         const currentSpeed = p.boostTimer > 0 ? p.speed * 1.5 : p.speed;
 
-        if (p.isGrappling && p.grappleNode) {
-            const gx = p.grappleNode.x;
-            const gy = p.grappleNode.y;
-            const px = p.x + p.width / 2;
-            const py = p.y + p.height / 2;
-
-            const dx = px - gx;
-            const dy = py - gy;
-            const currentDist = Math.hypot(dx, dy);
-
-            p.vy += this.GRAVITY;
-
-            if (currentDist > p.grappleLength) {
-                const angle = Math.atan2(dy, dx);
-                p.x = gx + Math.cos(angle) * p.grappleLength - p.width / 2;
-                p.y = gy + Math.sin(angle) * p.grappleLength - p.height / 2;
-
-                const tension = 0.12;
-                p.vx -= Math.cos(angle) * tension;
-            }
-
-            if (this.keys.left) p.vx -= 0.15;
-            if (this.keys.right) p.vx += 0.15;
-        }
-        else if (p.isGroundPounding) {
+        if (p.isGroundPounding) {
             p.vx = 0;
             p.vy = 14.0;
         } else if (p.isDashing) {
@@ -982,7 +874,7 @@ class PlatformerGame {
                 x: p.x + p.width / 2,
                 y: p.y + p.height / 2,
                 alpha: 0.6,
-                color: p.isGroundPounding ? '#ef4444' : (state.selectedSkin === 'electric' ? '#38bdf8' : (state.selectedSkin === 'gold' ? '#facc15' : '#ef4444'))
+                color: '#f97316'
             });
         }
         p.trail.forEach(t => t.alpha -= 0.05);
@@ -1220,7 +1112,7 @@ class PlatformerGame {
                 store.addScore(30);
                 this.sfx.playCheckpoint();
                 this.addParticles(this.keyItem.x, this.keyItem.y, '#facc15', 15);
-                this.addFloatingText(this.keyItem.x, this.keyItem.y, 'ปลดล็อกเกาะ Dream Island!', '#facc15');
+                this.addFloatingText(this.keyItem.x, this.keyItem.y, 'ปลดล็อกประตู!', '#facc15');
             }
         }
 
@@ -1317,14 +1209,14 @@ class PlatformerGame {
         }
 
         if (!p.isGrounded) {
-            p.scaleX = 0.85;
-            p.scaleY = 1.15;
+            p.scaleX = 0.88;
+            p.scaleY = 1.12;
             p.rotation = p.vx * 0.03;
         } else if (p.vx !== 0) {
             p.walkTimer += 0.22;
-            p.rotation = Math.sin(p.walkTimer) * 0.15;
-            p.scaleX = 1 + Math.sin(p.walkTimer) * 0.08;
-            p.scaleY = 1 - Math.sin(p.walkTimer) * 0.08;
+            p.rotation = Math.sin(p.walkTimer) * 0.12;
+            p.scaleX = 1 + Math.sin(p.walkTimer) * 0.06;
+            p.scaleY = 1 - Math.sin(p.walkTimer) * 0.06;
         } else {
             p.idleTimer += 0.08;
             p.rotation = 0;
@@ -1364,7 +1256,6 @@ class PlatformerGame {
             this.ctx.stroke();
 
         } else if (this.currentTheme === 'yoyle') {
-            // Yoyleland Purple Theme
             const yoyleGrad = this.ctx.createLinearGradient(0, 0, 0, h);
             yoyleGrad.addColorStop(0, '#3b0764');
             yoyleGrad.addColorStop(0.6, '#581c87');
@@ -1372,7 +1263,6 @@ class PlatformerGame {
             this.ctx.fillStyle = yoyleGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            // Cartoon Yoyle City Silhouettes
             this.ctx.fillStyle = '#2e1065';
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 3;
@@ -1388,7 +1278,6 @@ class PlatformerGame {
             this.ctx.stroke();
 
         } else {
-            // Goofy BFDI Sky & Grassland Theme
             const skyGrad = this.ctx.createLinearGradient(0, 0, 0, h);
             skyGrad.addColorStop(0, '#38bdf8');
             skyGrad.addColorStop(0.7, '#7dd3fc');
@@ -1396,7 +1285,6 @@ class PlatformerGame {
             this.ctx.fillStyle = skyGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            // Goofy Green Hills with Thick Black Outlines
             this.ctx.fillStyle = '#4ade80';
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 4;
@@ -1411,7 +1299,6 @@ class PlatformerGame {
             this.ctx.fill();
             this.ctx.stroke();
 
-            // Cartoon BFDI Clouds with Black Outlines
             const clouds = [
                 { x: (w * 0.1 + time * 12 - parallaxX) % (w + 200) - 100, y: 60, scale: 0.9 },
                 { x: (w * 0.5 + time * 8 - parallaxX) % (w + 220) - 110, y: 100, scale: 1.15 },
@@ -1433,38 +1320,117 @@ class PlatformerGame {
         }
     }
 
-    // Custom Cartoon Facial Expression Helper for BFDI Style
-    drawBFDIFace(x, y, w, h, facing = 'right', expression = 'happy') {
-        this.ctx.save();
-        this.ctx.translate(x, y);
+    // Helper: Draw Star
+    drawStar(cx, cy, spikes, outerRadius, innerRadius, fillStyle, strokeStyle) {
+        let rot = (Math.PI / 2) * 3;
+        let x = cx;
+        let y = cy;
+        const step = Math.PI / spikes;
 
-        if (facing === 'left') {
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.moveTo(cx, cy - outerRadius);
+        for (let i = 0; i < spikes; i++) {
+            x = cx + Math.cos(rot) * outerRadius;
+            y = cy + Math.sin(rot) * outerRadius;
+            this.ctx.lineTo(x, y);
+            rot += step;
+
+            x = cx + Math.cos(rot) * innerRadius;
+            y = cy + Math.sin(rot) * innerRadius;
+            this.ctx.lineTo(x, y);
+            rot += step;
+        }
+        this.ctx.lineTo(cx, cy - outerRadius);
+        this.ctx.closePath();
+
+        this.ctx.fillStyle = fillStyle;
+        this.ctx.fill();
+
+        if (strokeStyle) {
+            this.ctx.strokeStyle = strokeStyle;
+            this.ctx.lineWidth = 2.5;
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
+    }
+
+    // Custom Player Drawing Routine (Procedural Flame + Star Character)
+    drawFireStarPlayer(p) {
+        const w = p.width;
+        const h = p.height;
+
+        this.ctx.save();
+
+        if (p.facing === 'left') {
             this.ctx.scale(-1, 1);
         }
 
-        this.ctx.fillStyle = '#000000';
-        this.ctx.strokeStyle = '#000000';
-        this.ctx.lineWidth = 2.5;
+        // 1. Floating Star above Head
+        const starFloatY = -h * 1.15 + Math.sin(this.levelTime * 0.12) * 2.5;
+        this.drawStar(0, starFloatY, 5, 7, 3.5, '#facc15', '#ffffff');
 
-        // Oval Eyes
+        // 2. White Outer Sticker Glow / Border
+        this.ctx.fillStyle = '#ffffff';
         this.ctx.beginPath();
-        this.ctx.ellipse(-w * 0.18, -h * 0.1, 2.5, 5, 0, 0, Math.PI * 2);
-        this.ctx.ellipse(w * 0.18, -h * 0.1, 2.5, 5, 0, 0, Math.PI * 2);
+        this.ctx.arc(0, -h * 0.45, w * 0.56, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // BFDI Cartoon Mouth
+        // 3. Flame Main Body (Orange Flame Shape)
+        this.ctx.fillStyle = '#ff781f';
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2.5;
+
         this.ctx.beginPath();
-        if (expression === 'shocked') {
-            this.ctx.ellipse(0, h * 0.18, 4, 6, 0, 0, Math.PI * 2);
-            this.ctx.fill();
-        } else if (expression === 'angry') {
-            this.ctx.moveTo(-w * 0.2, h * 0.22);
-            this.ctx.lineTo(w * 0.2, h * 0.12);
-            this.ctx.stroke();
-        } else {
-            this.ctx.arc(0, h * 0.1, 6, 0.1, Math.PI - 0.1);
-            this.ctx.stroke();
-        }
+        // Top Flame Crown Peaks
+        this.ctx.moveTo(-w * 0.45, -h * 0.65);
+        this.ctx.quadraticCurveTo(-w * 0.35, -h * 0.85, -w * 0.2, -h * 0.7);
+        this.ctx.quadraticCurveTo(-w * 0.08, -h * 0.8, 0, -h * 0.68);
+        this.ctx.quadraticCurveTo(w * 0.08, -h * 0.8, w * 0.2, -h * 0.7);
+        this.ctx.quadraticCurveTo(w * 0.35, -h * 0.85, w * 0.45, -h * 0.65);
+        // Round Body Curve
+        this.ctx.quadraticCurveTo(w * 0.55, -h * 0.15, 0, 0);
+        this.ctx.quadraticCurveTo(-w * 0.55, -h * 0.15, -w * 0.45, -h * 0.65);
+        this.ctx.closePath();
+        this.ctx.fill();
+
+        // 4. Inner Flame Layer (Yellow)
+        this.ctx.fillStyle = '#ffca28';
+        this.ctx.beginPath();
+        this.ctx.moveTo(-w * 0.32, -h * 0.55);
+        this.ctx.quadraticCurveTo(0, -h * 0.65, w * 0.32, -h * 0.55);
+        this.ctx.quadraticCurveTo(w * 0.38, -h * 0.18, 0, -h * 0.08);
+        this.ctx.quadraticCurveTo(-w * 0.38, -h * 0.18, -w * 0.32, -h * 0.55);
+        this.ctx.closePath();
+        this.ctx.fill();
+
+        // 5. Side Nub Arms
+        this.ctx.fillStyle = '#ff781f';
+        this.ctx.beginPath();
+        this.ctx.arc(-w * 0.42, -h * 0.25, 4, 0, Math.PI * 2);
+        this.ctx.arc(w * 0.42, -h * 0.25, 4, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // 6. Cute Face (Eyes & Smile)
+        this.ctx.fillStyle = '#212121';
+        this.ctx.beginPath();
+        this.ctx.arc(-w * 0.14, -h * 0.38, 3.2, 0, Math.PI * 2);
+        this.ctx.arc(w * 0.14, -h * 0.38, 3.2, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Eye Highlights
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.beginPath();
+        this.ctx.arc(-w * 0.14 - 1, -h * 0.38 - 1, 1.2, 0, Math.PI * 2);
+        this.ctx.arc(w * 0.14 - 1, -h * 0.38 - 1, 1.2, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Happy Curved Smile Line
+        this.ctx.strokeStyle = '#212121';
+        this.ctx.lineWidth = 2.2;
+        this.ctx.beginPath();
+        this.ctx.arc(0, -h * 0.32, 5.5, 0.2, Math.PI - 0.2);
+        this.ctx.stroke();
 
         this.ctx.restore();
     }
@@ -1499,32 +1465,7 @@ class PlatformerGame {
 
         this.ctx.translate(-this.cameraX, 0);
 
-        // Render Grapple Nodes
-        this.grappleNodes.forEach(node => {
-            this.ctx.save();
-            this.ctx.beginPath();
-            this.ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-            this.ctx.fillStyle = '#38bdf8';
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 3;
-            this.ctx.fill();
-            this.ctx.stroke();
-            this.ctx.restore();
-        });
-
-        const p = this.player;
-        if (p.isGrappling && p.grappleNode) {
-            this.ctx.save();
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 4;
-            this.ctx.beginPath();
-            this.ctx.moveTo(p.x + p.width / 2, p.y + p.height / 2);
-            this.ctx.lineTo(p.grappleNode.x, p.grappleNode.y);
-            this.ctx.stroke();
-            this.ctx.restore();
-        }
-
-        // Render Particles
+        // Particles
         this.particles.forEach(pt => {
             this.ctx.beginPath();
             this.ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
@@ -1533,6 +1474,8 @@ class PlatformerGame {
             this.ctx.fill();
             this.ctx.globalAlpha = 1.0;
         });
+
+        const p = this.player;
 
         // Trail FX
         p.trail.forEach(t => {
@@ -1582,7 +1525,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Goal Portal (Dream Island Gate)
+        // Render Goal Portal
         if (this.goal) {
             this.ctx.save();
             const isLocked = this.goal.isLocked;
@@ -1598,8 +1541,7 @@ class PlatformerGame {
                 this.ctx.fillStyle = '#facc15';
                 this.ctx.font = 'bold 12px sans-serif';
                 this.ctx.textAlign = 'center';
-                this.ctx.fillText('DREAM', this.goal.x + this.goal.width / 2, this.goal.y + 18);
-                this.ctx.fillText('ISLAND', this.goal.x + this.goal.width / 2, this.goal.y + 32);
+                this.ctx.fillText('GOAL', this.goal.x + this.goal.width / 2, this.goal.y + 26);
             } else {
                 this.ctx.fillStyle = '#ef4444';
                 this.ctx.font = 'bold 16px sans-serif';
@@ -1610,7 +1552,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render BFDI Stylized Platforms
+        // Render Platforms
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
             if (plat.type === 'phase' && !plat.active) return;
@@ -1684,8 +1626,6 @@ class PlatformerGame {
             this.ctx.fillRect(b.x, b.y, b.width, b.height);
             this.ctx.strokeRect(b.x, b.y, b.width, b.height);
 
-            this.drawBFDIFace(b.x + b.width / 2, b.y + b.height / 2, b.width, b.height, 'right', 'angry');
-
             const hpWidth = b.width;
             const currentHpW = (b.hp / b.maxHp) * hpWidth;
             this.ctx.fillStyle = '#000000';
@@ -1696,7 +1636,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Enemies (BFDI Speaker Boxes / Announcers)
+        // Render Enemies
         this.enemies.forEach(e => {
             if (e.isDefeated) return;
             this.ctx.save();
@@ -1708,23 +1648,12 @@ class PlatformerGame {
             const feetY = e.y + e.height;
             this.ctx.translate(feetX, feetY);
 
-            // Cartoon Metal Box Announcer Style
             this.ctx.fillStyle = '#9ca3af';
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 3;
 
             this.ctx.fillRect(-renderW / 2, -renderH, renderW, renderH);
             this.ctx.strokeRect(-renderW / 2, -renderH, renderW, renderH);
-
-            // Stick Legs
-            this.ctx.beginPath();
-            this.ctx.moveTo(-renderW * 0.25, 0);
-            this.ctx.lineTo(-renderW * 0.25, 6);
-            this.ctx.moveTo(renderW * 0.25, 0);
-            this.ctx.lineTo(renderW * 0.25, 6);
-            this.ctx.stroke();
-
-            this.drawBFDIFace(0, -renderH / 2, renderW, renderH, e.vx < 0 ? 'left' : 'right', 'angry');
 
             this.ctx.restore();
         });
@@ -1782,7 +1711,7 @@ class PlatformerGame {
             }
         });
 
-        // Render Coins (BFDI Win Tokens)
+        // Render Coins
         this.coins.forEach(coin => {
             if (!coin.collected) {
                 const spinScale = Math.abs(Math.sin(this.levelTime * 0.08));
@@ -1798,19 +1727,13 @@ class PlatformerGame {
                 this.ctx.fill();
                 this.ctx.stroke();
 
-                this.ctx.fillStyle = '#000000';
-                this.ctx.font = 'bold 9px sans-serif';
-                this.ctx.textAlign = 'center';
-                this.ctx.textBaseline = 'middle';
-                this.ctx.fillText('W', 0, 0);
-
                 this.ctx.restore();
             }
         });
 
-        // Render Player (BFDI Style Character with Stick Limbs & Face)
+        // Render Fire Star Player Character
         if (p.invincibleTimer > 0 && Math.floor(p.invincibleTimer / 4) % 2 === 0) {
-            // Flashing
+            // Invincible Flashing
         } else {
             this.ctx.save();
             const feetX = p.x + p.width / 2;
@@ -1820,12 +1743,9 @@ class PlatformerGame {
             this.ctx.rotate(p.rotation);
             this.ctx.scale(p.scaleX, p.scaleY);
 
-            const skin = store.getState().selectedSkin;
-            const bodyColor = skin === 'electric' ? '#38bdf8' : (skin === 'gold' ? '#facc15' : '#f97316');
-
             if (p.hasShield) {
                 this.ctx.beginPath();
-                this.ctx.arc(0, -p.height / 2, p.height * 0.7, 0, Math.PI * 2);
+                this.ctx.arc(0, -p.height / 2, p.height * 0.68, 0, Math.PI * 2);
                 this.ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
                 this.ctx.strokeStyle = '#38bdf8';
                 this.ctx.lineWidth = 2.5;
@@ -1833,49 +1753,7 @@ class PlatformerGame {
                 this.ctx.stroke();
             }
 
-            // Draw Stick Limbs
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 3;
-            // Legs
-            this.ctx.beginPath();
-            this.ctx.moveTo(-8, -4);
-            this.ctx.lineTo(-10, 0);
-            this.ctx.moveTo(8, -4);
-            this.ctx.lineTo(10, 0);
-            // Arms
-            this.ctx.moveTo(-12, -p.height * 0.5);
-            this.ctx.lineTo(-18, -p.height * 0.3);
-            this.ctx.moveTo(12, -p.height * 0.5);
-            this.ctx.lineTo(18, -p.height * 0.3);
-            this.ctx.stroke();
-
-            // Firey / Leafy / Object Body Shape
-            this.ctx.fillStyle = bodyColor;
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 3.5;
-
-            this.ctx.beginPath();
-            if (skin === 'electric') {
-                // Leafy Shape
-                this.ctx.moveTo(0, -p.height * 1.1);
-                this.ctx.quadraticCurveTo(p.width * 0.7, -p.height * 0.6, 0, 0);
-                this.ctx.quadraticCurveTo(-p.width * 0.7, -p.height * 0.6, 0, -p.height * 1.1);
-            } else if (skin === 'gold') {
-                // Coiny Shape
-                this.ctx.arc(0, -p.height / 2, p.width / 2, 0, Math.PI * 2);
-            } else {
-                // Firey Shape
-                this.ctx.moveTo(0, -p.height * 1.2);
-                this.ctx.quadraticCurveTo(p.width * 0.6, -p.height * 0.7, p.width / 2, -p.height * 0.2);
-                this.ctx.quadraticCurveTo(0, 0, -p.width / 2, -p.height * 0.2);
-                this.ctx.quadraticCurveTo(-p.width * 0.6, -p.height * 0.7, 0, -p.height * 1.2);
-            }
-            this.ctx.closePath();
-            this.ctx.fill();
-            this.ctx.stroke();
-
-            // Face
-            this.drawBFDIFace(0, -p.height / 2, p.width, p.height, p.facing, p.isDashing ? 'shocked' : 'happy');
+            this.drawFireStarPlayer(p);
 
             this.ctx.restore();
         }

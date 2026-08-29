@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Platformer Pro - BFDI Edition</title>
-    <link rel="stylesheet" href="styles.css?v=8">
+    <title>Platformer Pro - Fire Star Edition</title>
+    <link rel="stylesheet" href="styles.css?v=9">
     
     <!-- PWA & App Icon Config -->
     <link rel="manifest" href="manifest.json">
@@ -17,7 +17,7 @@
     <div id="app">
         <!-- App Header Bar -->
         <header class="app-header">
-            <h1>Platformer Pro (BFDI)</h1>
+            <h1>Platformer Pro</h1>
             <div class="header-stats">
                 <span>ด่าน: <strong id="hud-level">1</strong></span>
                 <span>คะแนน: <strong id="hud-score">0</strong></span>
@@ -42,14 +42,13 @@
                     </div>
                 </div>
 
-                <!-- Touch Controller Overlay (BFDI Cartoon Style) -->
+                <!-- Touch Controller Overlay -->
                 <div class="touch-controls">
                     <div class="dpad">
                         <button id="btn-left" class="touch-btn">◀</button>
                         <button id="btn-right" class="touch-btn">▶</button>
                     </div>
                     <div class="action-btns">
-                        <button id="btn-grapple" class="touch-btn btn-grapple">🪝</button>
                         <button id="btn-dash" class="touch-btn btn-dash">⚡ พุ่ง</button>
                         <button id="btn-jump" class="touch-btn btn-action">กระโดด</button>
                     </div>
@@ -64,7 +63,7 @@
                         <div class="coin-balance">🪙 เหรียญสะสม: <strong id="shop-coins">0</strong></div>
                     </div>
                     
-                    <h3 class="shop-section-title">🎨 สกินตัวละคร BFDI</h3>
+                    <h3 class="shop-section-title">🎨 สกินตัวละคร</h3>
                     <div class="shop-grid" id="skins-grid">
                         <!-- Skin items rendered dynamically -->
                     </div>
@@ -129,6 +128,6 @@
         </nav>
     </div>
 
-    <script type="module" src="app.js?v=8"></script>
+    <script type="module" src="app.js?v=9"></script>
 </body>
 </html>
