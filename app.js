@@ -101,7 +101,7 @@ class PlatformerGame {
         this.ui = new UIManager();
         this.sfx = new SoundFX();
         
-        // Controls (Removed Grapple)
+        // Controls
         this.keys = { left: false, right: false, up: false, down: false, jump: false, dash: false };
         this.animationFrameId = null;
 
@@ -274,8 +274,14 @@ class PlatformerGame {
             const gapWidth = isBossLevel ? 0 : Math.min(105, 50 + Math.floor(seed * 40) + Math.min(level, 15));
             currX += gapWidth;
 
-            const platWidth = isBossLevel ? 800 : Math.max(150, 240 - level * 2 + Math.floor(seed * 60));
-            const platY = h - 35;
+            const platWidth = isBossLevel ? 900 : Math.max(150, 240 - level * 2 + Math.floor(seed * 60));
+            
+            // คำนวณระดับความสูง-ต่ำของพื้นแบบขั้นบันได/เนิน (Dynamic Terrain Elevation)
+            let heightVariation = 0;
+            if (!isBossLevel && platformId > 1) {
+                heightVariation = Math.sin(platformId * 0.85 + level * 0.5) * 55 + (seed - 0.5) * 40;
+            }
+            const platY = isBossLevel ? h - 35 : Math.max(h - 220, Math.min(h - 35, Math.floor((h - 35) + heightVariation)));
 
             let pType = 'normal';
             if (platformId > 1 && !isBossLevel) {
@@ -313,7 +319,7 @@ class PlatformerGame {
             if (seed > 0.52 && !isBossLevel && platWidth >= 160) {
                 hasUpperPlat = true;
                 floatWidth = Math.max(90, platWidth * 0.55);
-                floatY = platY - 90 - Math.floor(seed * 20);
+                floatY = platY - 85 - Math.floor(seed * 20);
                 platforms.push({
                     x: currX + (platWidth - floatWidth) / 2,
                     y: floatY,
@@ -370,23 +376,26 @@ class PlatformerGame {
             currX += platWidth;
         }
 
-        platforms.push({ x: levelWidth - 320, y: h - 35, width: 320, height: 35, type: 'normal' });
+        const lastPlatY = h - 35;
+        platforms.push({ x: levelWidth - 320, y: lastPlatY, width: 320, height: 35, type: 'normal' });
 
+        // กำหนดบอส: ต้องเหยียบหัว 3 รอบเท่านั้น
         if (isBossLevel) {
-            const bossHp = Math.min(3 + Math.floor(level / 10) * 2, 9);
+            const bossHp = 3;
             const bossX = levelWidth / 2;
             boss = {
                 x: bossX,
-                y: h - 85,
-                width: 55,
-                height: 50,
+                y: h - 90,
+                width: 60,
+                height: 55,
                 hp: bossHp,
                 maxHp: bossHp,
-                vx: 1.3 + (level * 0.015),
-                minX: bossX - 180,
-                maxX: bossX + 180,
+                vx: 1.4 + (level * 0.015),
+                minX: bossX - 220,
+                maxX: bossX + 220,
                 shootTimer: 0,
-                isDefeated: false
+                isDefeated: false,
+                hitTimer: 0
             };
         }
 
@@ -403,18 +412,20 @@ class PlatformerGame {
 
         let checkpoint = null;
         if (level >= 4 && !isBossLevel) {
+            const midPlat = platforms[Math.floor(platforms.length / 2)] || { x: levelWidth * 0.45, y: h - 35 };
             checkpoint = {
-                x: levelWidth * 0.45,
-                y: h - 65,
+                x: midPlat.x + midPlat.width / 2 - 10,
+                y: midPlat.y - 30,
                 width: 20,
                 height: 30,
                 active: false
             };
         }
 
+        // หากเป็นด่านบอส กุญแจจะซ่อนไว้ก่อน จนกว่าจะชนะบอส
         const keyItem = {
-            x: levelWidth * 0.65,
-            y: h - 85,
+            x: isBossLevel ? -999 : levelWidth * 0.65,
+            y: isBossLevel ? -999 : h - 85,
             width: 22,
             height: 22,
             collected: false
@@ -422,7 +433,7 @@ class PlatformerGame {
 
         const goal = {
             x: levelWidth - 90,
-            y: h - 80,
+            y: lastPlatY - 45,
             width: 40,
             height: 45,
             isLocked: true
@@ -973,12 +984,15 @@ class PlatformerGame {
             }
         });
 
+        // อัปเดตและตรวจจับการเหยียบหัวบอส (ต้องเหยียบ 3 ครั้ง)
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             b.x += b.vx;
             if (b.x <= b.minX || b.x + b.width >= b.maxX) {
                 b.vx *= -1;
             }
+
+            if (b.hitTimer > 0) b.hitTimer--;
 
             b.shootTimer++;
             if (b.shootTimer >= 70) {
@@ -1000,9 +1014,11 @@ class PlatformerGame {
                 p.y < b.y + b.height &&
                 p.y + p.height > b.y
             ) {
-                if (p.vy > 0 && (p.y + p.height - p.vy) <= b.y + 16) {
+                // ตรวจจับเฉพาะการกระโดดลงมาเหยียบหัวบอสจากด้านบน
+                if (p.vy > 0 && (p.y + p.height - p.vy) <= b.y + 20) {
                     b.hp--;
-                    p.vy = -9.0;
+                    b.hitTimer = 15;
+                    p.vy = -9.5;
                     this.sfx.playHit();
                     this.triggerShake(12, 16);
                     this.hitFreezeTimer = 6;
@@ -1011,13 +1027,14 @@ class PlatformerGame {
                     if (b.hp <= 0) {
                         b.isDefeated = true;
                         store.addScore(300);
-                        this.addFloatingText(b.x, b.y, '🏆 บอสพ่ายแพ้! +300', '#facc15');
+                        this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ได้รับกุญแจ!', '#facc15');
+                        // เมื่อเหยียบครบ 3 ครั้ง กุญแจจะดร็อปสปอว์นลงมาจากตัวบอส
                         if (this.keyItem) {
-                            this.keyItem.x = b.x + b.width / 2 - 10;
-                            this.keyItem.y = b.y;
+                            this.keyItem.x = b.x + b.width / 2 - 11;
+                            this.keyItem.y = b.y - 10;
                         }
                     } else {
-                        this.addFloatingText(b.x, b.y, `BOSS HP: ${b.hp}/${b.maxHp}`, '#ef4444');
+                        this.addFloatingText(b.x, b.y - 20, `💥 เหยียบแล้ว! HP เหลือ: ${b.hp}/${b.maxHp}`, '#ef4444');
                     }
                 } else {
                     this.handlePlayerDamage();
@@ -1101,7 +1118,6 @@ class PlatformerGame {
 
         if (this.keyItem && !this.keyItem.collected) {
             if (
-                (p.y + p.height) <= (this.keyItem.y + this.keyItem.height + 8) &&
                 p.x < this.keyItem.x + this.keyItem.width &&
                 p.x + p.width > this.keyItem.x &&
                 p.y < this.keyItem.y + this.keyItem.height &&
@@ -1178,7 +1194,6 @@ class PlatformerGame {
         if (
             this.goal &&
             !this.goal.isLocked &&
-            (p.y + p.height) <= (this.goal.y + this.goal.height + 6) &&
             p.x < this.goal.x + this.goal.width &&
             p.x + p.width > this.goal.x &&
             p.y < this.goal.y + this.goal.height &&
@@ -1320,7 +1335,6 @@ class PlatformerGame {
         }
     }
 
-    // Helper: Draw Star
     drawStar(cx, cy, spikes, outerRadius, innerRadius, fillStyle, strokeStyle) {
         let rot = (Math.PI / 2) * 3;
         let x = cx;
@@ -1355,7 +1369,6 @@ class PlatformerGame {
         this.ctx.restore();
     }
 
-    // Custom Player Drawing Routine (Procedural Flame + Star Character)
     drawFireStarPlayer(p) {
         const w = p.width;
         const h = p.height;
@@ -1366,35 +1379,29 @@ class PlatformerGame {
             this.ctx.scale(-1, 1);
         }
 
-        // 1. Floating Star above Head
         const starFloatY = -h * 1.15 + Math.sin(this.levelTime * 0.12) * 2.5;
         this.drawStar(0, starFloatY, 5, 7, 3.5, '#facc15', '#ffffff');
 
-        // 2. White Outer Sticker Glow / Border
         this.ctx.fillStyle = '#ffffff';
         this.ctx.beginPath();
         this.ctx.arc(0, -h * 0.45, w * 0.56, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // 3. Flame Main Body (Orange Flame Shape)
         this.ctx.fillStyle = '#ff781f';
         this.ctx.strokeStyle = '#ffffff';
         this.ctx.lineWidth = 2.5;
 
         this.ctx.beginPath();
-        // Top Flame Crown Peaks
         this.ctx.moveTo(-w * 0.45, -h * 0.65);
         this.ctx.quadraticCurveTo(-w * 0.35, -h * 0.85, -w * 0.2, -h * 0.7);
         this.ctx.quadraticCurveTo(-w * 0.08, -h * 0.8, 0, -h * 0.68);
         this.ctx.quadraticCurveTo(w * 0.08, -h * 0.8, w * 0.2, -h * 0.7);
         this.ctx.quadraticCurveTo(w * 0.35, -h * 0.85, w * 0.45, -h * 0.65);
-        // Round Body Curve
         this.ctx.quadraticCurveTo(w * 0.55, -h * 0.15, 0, 0);
         this.ctx.quadraticCurveTo(-w * 0.55, -h * 0.15, -w * 0.45, -h * 0.65);
         this.ctx.closePath();
         this.ctx.fill();
 
-        // 4. Inner Flame Layer (Yellow)
         this.ctx.fillStyle = '#ffca28';
         this.ctx.beginPath();
         this.ctx.moveTo(-w * 0.32, -h * 0.55);
@@ -1404,28 +1411,24 @@ class PlatformerGame {
         this.ctx.closePath();
         this.ctx.fill();
 
-        // 5. Side Nub Arms
         this.ctx.fillStyle = '#ff781f';
         this.ctx.beginPath();
         this.ctx.arc(-w * 0.42, -h * 0.25, 4, 0, Math.PI * 2);
         this.ctx.arc(w * 0.42, -h * 0.25, 4, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // 6. Cute Face (Eyes & Smile)
         this.ctx.fillStyle = '#212121';
         this.ctx.beginPath();
         this.ctx.arc(-w * 0.14, -h * 0.38, 3.2, 0, Math.PI * 2);
         this.ctx.arc(w * 0.14, -h * 0.38, 3.2, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Eye Highlights
         this.ctx.fillStyle = '#ffffff';
         this.ctx.beginPath();
         this.ctx.arc(-w * 0.14 - 1, -h * 0.38 - 1, 1.2, 0, Math.PI * 2);
         this.ctx.arc(w * 0.14 - 1, -h * 0.38 - 1, 1.2, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Happy Curved Smile Line
         this.ctx.strokeStyle = '#212121';
         this.ctx.lineWidth = 2.2;
         this.ctx.beginPath();
@@ -1615,23 +1618,96 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // Render Boss
+        // Render Boss พร้อมดีไซน์ใบหน้าดุดัน (Boss Face Visuals)
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             this.ctx.save();
-            this.ctx.fillStyle = '#dc2626';
+
+            // ตัวบอสหลัก
+            this.ctx.fillStyle = b.hitTimer > 0 ? '#ffffff' : '#dc2626';
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 3.5;
 
             this.ctx.fillRect(b.x, b.y, b.width, b.height);
             this.ctx.strokeRect(b.x, b.y, b.width, b.height);
 
+            // เขาบอสสีเข้มบนหัว
+            this.ctx.fillStyle = '#991b1b';
+            this.ctx.beginPath();
+            this.ctx.moveTo(b.x + 8, b.y);
+            this.ctx.lineTo(b.x + 3, b.y - 12);
+            this.ctx.lineTo(b.x + 18, b.y);
+            this.ctx.fill();
+            this.ctx.stroke();
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(b.x + b.width - 8, b.y);
+            this.ctx.lineTo(b.x + b.width - 3, b.y - 12);
+            this.ctx.lineTo(b.x + b.width - 18, b.y);
+            this.ctx.fill();
+            this.ctx.stroke();
+
+            // ดวงตาดุดันสีเหลืองสด
+            this.ctx.fillStyle = '#facc15';
+            // ตาซ้าย
+            this.ctx.beginPath();
+            this.ctx.moveTo(b.x + 10, b.y + 15);
+            this.ctx.lineTo(b.x + 24, b.y + 20);
+            this.ctx.lineTo(b.x + 10, b.y + 25);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.stroke();
+
+            // ตาขวา
+            this.ctx.beginPath();
+            this.ctx.moveTo(b.x + b.width - 10, b.y + 15);
+            this.ctx.lineTo(b.x + b.width - 24, b.y + 20);
+            this.ctx.lineTo(b.x + b.width - 10, b.y + 25);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.stroke();
+
+            // รูม่านตา
+            this.ctx.fillStyle = '#000000';
+            this.ctx.fillRect(b.x + 15, b.y + 18, 4, 5);
+            this.ctx.fillRect(b.x + b.width - 19, b.y + 18, 4, 5);
+
+            // คิ้วขมวดเพิ่มความน่ากลัว
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.moveTo(b.x + 8, b.y + 12);
+            this.ctx.lineTo(b.x + 26, b.y + 18);
+            this.ctx.moveTo(b.x + b.width - 8, b.y + 12);
+            this.ctx.lineTo(b.x + b.width - 26, b.y + 18);
+            this.ctx.stroke();
+
+            // ปากพร้อมเขี้ยว
+            this.ctx.fillStyle = '#450a0a';
+            this.ctx.fillRect(b.x + 12, b.y + 32, b.width - 24, 12);
+            this.ctx.strokeRect(b.x + 12, b.y + 32, b.width - 24, 12);
+
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.moveTo(b.x + 15, b.y + 32);
+            this.ctx.lineTo(b.x + 19, b.y + 38);
+            this.ctx.lineTo(b.x + 23, b.y + 32);
+            
+            this.ctx.moveTo(b.x + b.width - 15, b.y + 32);
+            this.ctx.lineTo(b.x + b.width - 19, b.y + 38);
+            this.ctx.lineTo(b.x + b.width - 23, b.y + 32);
+            this.ctx.fill();
+
+            // หลอดเลือด HP ด้านบนตัวบอส
             const hpWidth = b.width;
             const currentHpW = (b.hp / b.maxHp) * hpWidth;
             this.ctx.fillStyle = '#000000';
-            this.ctx.fillRect(b.x, b.y - 14, hpWidth, 8);
+            this.ctx.fillRect(b.x, b.y - 22, hpWidth, 8);
             this.ctx.fillStyle = '#ef4444';
-            this.ctx.fillRect(b.x, b.y - 14, currentHpW, 8);
+            this.ctx.fillRect(b.x, b.y - 22, currentHpW, 8);
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 1.5;
+            this.ctx.strokeRect(b.x, b.y - 22, hpWidth, 8);
 
             this.ctx.restore();
         }
@@ -1672,7 +1748,7 @@ class PlatformerGame {
         });
 
         // Render Key Item
-        if (this.keyItem && !this.keyItem.collected) {
+        if (this.keyItem && !this.keyItem.collected && this.keyItem.x > -100) {
             this.ctx.save();
             const keyY = this.keyItem.y + Math.sin(this.levelTime * 0.08) * 4;
             this.ctx.translate(this.keyItem.x + 10, keyY + 10);
