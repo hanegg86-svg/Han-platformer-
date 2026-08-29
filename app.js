@@ -277,24 +277,22 @@ class PlatformerGame {
         const grappleNodes = [];
         let boss = null;
 
-        // Ground generation with gaps (pits)
+        // Ground generation with clean layout & guaranteed jump gaps
         let currX = 0;
-        // Start ground area (safe zone)
-        platforms.push({ x: 0, y: h - 30, width: 280, height: 30, type: 'normal' });
-        currX = 280;
+        platforms.push({ x: 0, y: h - 30, width: 300, height: 30, type: 'normal' });
+        currX = 300;
 
         let platformId = 0;
-        while (currX < levelWidth - 250) {
+        while (currX < levelWidth - 300) {
             platformId++;
             const seed = Math.abs(Math.sin(level * 12.9898 + platformId * 78.233));
             
-            // Generate Gap
-            const gapWidth = isBossLevel ? 0 : Math.min(140, 60 + Math.floor(seed * 60) + (level * 1.5));
+            // Guaranteed jumpable gap width (Max 110px)
+            const gapWidth = isBossLevel ? 0 : Math.min(110, 50 + Math.floor(seed * 45) + Math.min(level, 15));
             currX += gapWidth;
 
-            // Generate Platform Length & Height
-            const platWidth = isBossLevel ? 800 : Math.max(100, 260 - level * 3 + Math.floor(seed * 80));
-            const platY = h - 30 - Math.floor((seed * 0.7) * 90);
+            const platWidth = isBossLevel ? 800 : Math.max(140, 240 - level * 2 + Math.floor(seed * 60));
+            const platY = h - 30;
 
             let pType = 'normal';
             if (platformId > 1 && !isBossLevel) {
@@ -306,7 +304,7 @@ class PlatformerGame {
                 x: currX,
                 y: platY,
                 width: platWidth,
-                height: 20,
+                height: 30,
                 type: pType
             };
 
@@ -320,16 +318,20 @@ class PlatformerGame {
                 platObj.respawnTimer = 0;
             } else if (pType === 'moving') {
                 platObj.vx = (platformId % 2 === 0 ? 1 : -1) * (0.8 + (level * 0.02));
-                platObj.minX = Math.max(0, currX - 60);
-                platObj.maxX = Math.min(levelWidth, currX + platWidth + 60);
+                platObj.minX = Math.max(0, currX - 50);
+                platObj.maxX = Math.min(levelWidth, currX + platWidth + 50);
             }
 
             platforms.push(platObj);
 
-            // Floating upper platforms
-            if (seed > 0.45 && !isBossLevel) {
-                const floatWidth = Math.max(80, platWidth * 0.6);
-                const floatY = platY - 80 - Math.floor(seed * 40);
+            // Clean upper floating platform with strictly controlled clearance (at least 85px gap)
+            let hasUpperPlat = false;
+            let floatY = 0;
+            let floatWidth = 0;
+            if (seed > 0.5 && !isBossLevel && platWidth >= 160) {
+                hasUpperPlat = true;
+                floatWidth = Math.max(90, platWidth * 0.55);
+                floatY = platY - 85 - Math.floor(seed * 25);
                 platforms.push({
                     x: currX + (platWidth - floatWidth) / 2,
                     y: floatY,
@@ -338,7 +340,6 @@ class PlatformerGame {
                     type: 'normal'
                 });
 
-                // Coins on upper floating platform
                 coins.push({
                     x: currX + platWidth / 2,
                     y: floatY - 22,
@@ -347,8 +348,8 @@ class PlatformerGame {
                 });
             }
 
-            // Grapple Node over large gaps
-            if (gapWidth > 90 && level >= 3 && !isBossLevel) {
+            // Grapple Node over gaps
+            if (gapWidth > 85 && level >= 3 && !isBossLevel) {
                 grappleNodes.push({
                     x: currX - gapWidth / 2,
                     y: platY - 110,
@@ -356,8 +357,8 @@ class PlatformerGame {
                 });
             }
 
-            // Ground coins & items
-            if (platformId % 2 === 0) {
+            // Ground coins
+            if (platformId % 2 === 0 && !hasUpperPlat) {
                 coins.push({
                     x: currX + platWidth / 2,
                     y: platY - 22,
@@ -366,21 +367,24 @@ class PlatformerGame {
                 });
             }
 
-            // Ground Spikes
-            if (level >= 3 && seed > 0.6 && !isBossLevel && platWidth > 150) {
+            // Spikes (Only on standard normal ground platforms, away from edges)
+            let hasSpike = false;
+            if (level >= 3 && seed > 0.65 && !isBossLevel && pType === 'normal' && platWidth >= 180) {
+                hasSpike = true;
+                const spikeW = Math.min(48, platWidth * 0.25);
                 spikes.push({
-                    x: currX + platWidth * 0.4,
+                    x: currX + platWidth * 0.38,
                     y: platY - 14,
-                    width: Math.min(60, platWidth * 0.3),
+                    width: spikeW,
                     height: 14
                 });
             }
 
-            // Enemies patrol on platforms
-            if (level >= 2 && seed > 0.5 && !isBossLevel && platWidth > 120) {
+            // Enemies patrol (Only if no spikes in same position and platform is wide)
+            if (level >= 2 && seed > 0.52 && !isBossLevel && pType === 'normal' && platWidth >= 150 && !hasSpike) {
                 const isRanged = (level >= 12 && platformId % 4 === 0);
                 enemies.push({
-                    x: currX + 20,
+                    x: currX + 15,
                     y: platY - 28,
                     width: 32,
                     height: 28,
@@ -396,8 +400,8 @@ class PlatformerGame {
             currX += platWidth;
         }
 
-        // Final goal platform
-        platforms.push({ x: levelWidth - 250, y: h - 30, width: 250, height: 30, type: 'normal' });
+        // Safe end goal area
+        platforms.push({ x: levelWidth - 300, y: h - 30, width: 300, height: 30, type: 'normal' });
 
         // Boss Setup
         if (isBossLevel) {
@@ -423,7 +427,7 @@ class PlatformerGame {
             const pType = level % 3 === 0 ? 'shield' : (level % 3 === 1 ? 'magnet' : 'boost');
             powerups.push({
                 x: levelWidth * 0.35,
-                y: h - 90,
+                y: h - 80,
                 type: pType,
                 collected: false,
                 radius: 10
@@ -444,8 +448,8 @@ class PlatformerGame {
 
         // Key Item Setup (Mid-Late level)
         const keyItem = {
-            x: levelWidth * 0.6,
-            y: h - 90,
+            x: levelWidth * 0.65,
+            y: h - 80,
             width: 20,
             height: 20,
             collected: false
@@ -534,6 +538,10 @@ class PlatformerGame {
             isGrounded: false,
             color: '#ef4444',
             
+            // Lives System
+            lives: 3,
+            maxLives: 3,
+
             jumpsLeft: 2,
             isDashing: false,
             dashTimer: 0,
@@ -582,7 +590,7 @@ class PlatformerGame {
         this.keyItem = levelData.keyItem;
         this.goal = levelData.goal;
 
-        // Lava Chaser Wall (Chases horizontally from behind)
+        // Lava Chaser Wall
         this.lava = {
             x: -250,
             speed: levelData.lavaSpeed
@@ -597,7 +605,7 @@ class PlatformerGame {
         p.vy = -5.5;
         p.isGroundPounding = false;
         p.isGrappling = false;
-        p.invincibleTimer = 60;
+        p.invincibleTimer = 75;
         p.hasShield = true;
         this.triggerShake(10, 15);
         this.sfx.playHit();
@@ -815,12 +823,19 @@ class PlatformerGame {
             this.sfx.playHit();
             this.triggerShake(8, 12);
             this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 16);
-        } else if (this.checkpoint && this.checkpoint.active) {
-            this.respawnAtCheckpoint();
-        } else if (!store.getState().isGameOver) {
+            this.addFloatingText(p.x - 10, p.y - 15, '🛡️ เกราะแตก!', '#38bdf8');
+        } else {
+            p.lives--;
             this.sfx.playHit();
-            this.triggerShake(14, 20);
-            store.setGameOver(true);
+            this.triggerShake(12, 18);
+
+            if (p.lives > 0) {
+                this.addFloatingText(p.x - 10, p.y - 15, `💔 เสีย 1 ชีวิต! (เหลือ ${p.lives})`, '#ef4444');
+                this.respawnAtCheckpoint();
+            } else if (!store.getState().isGameOver) {
+                this.addFloatingText(p.x - 10, p.y - 15, '💀 ชีวิตหมดแล้ว!', '#ef4444');
+                store.setGameOver(true);
+            }
         }
     }
 
@@ -1899,15 +1914,21 @@ class PlatformerGame {
 
         // 3. Render HUD Info & Overlays
         const elapsed = Math.floor(this.levelTime / 60);
-        this.ctx.font = 'bold 12px sans-serif';
+        this.ctx.font = 'bold 13px sans-serif';
+        this.ctx.fillStyle = '#ffffff';
+        
+        // Lives HUD Display
+        let livesStr = '❤️ '.repeat(Math.max(0, p.lives));
+        this.ctx.fillText(`ชีวิต: ${livesStr}`, 12, 22);
+
         this.ctx.fillStyle = elapsed > this.targetTime ? '#ef4444' : '#ffffff';
-        this.ctx.fillText(`⏱️ เวลา: ${elapsed}s / ${this.targetTime}s (ดาว 3)`, 12, 20);
+        this.ctx.fillText(`⏱️ เวลา: ${elapsed}s / ${this.targetTime}s`, 12, 42);
 
         if (this.comboCount > 1) {
             const currentMult = Math.min(5, 1 + Math.floor(this.comboCount / 3));
             this.ctx.fillStyle = '#f59e0b';
             this.ctx.font = 'bold 14px sans-serif';
-            this.ctx.fillText(`🔥 COMBO x${currentMult} (${this.comboCount})`, 12, 55);
+            this.ctx.fillText(`🔥 COMBO x${currentMult} (${this.comboCount})`, 12, 65);
         }
 
         // Lava Warning Vignette Overlay
