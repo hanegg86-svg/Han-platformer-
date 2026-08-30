@@ -92,6 +92,21 @@ class SoundFX {
         osc.start();
         osc.stop(this.ctx.currentTime + 0.3);
     }
+
+    playBurn() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.3);
+    }
 }
 
 class PlatformerGame {
@@ -101,6 +116,12 @@ class PlatformerGame {
         this.ui = new UIManager();
         this.sfx = new SoundFX();
         
+        // Asset Preloading
+        this.playerImg = new Image();
+        this.playerImg.src = 'player.png';
+        this.enemyImg = new Image();
+        this.enemyImg.src = 'enemy.png';
+
         // Controls
         this.keys = { left: false, right: false, up: false, down: false, jump: false, dash: false };
         this.animationFrameId = null;
@@ -128,6 +149,12 @@ class PlatformerGame {
         this.lava = null;
         this.keyItem = null;
         this.goal = null;
+
+        // Puzzle Entities
+        this.crates = [];
+        this.switches = [];
+        this.doors = [];
+        this.vines = [];
 
         // Camera System
         this.cameraX = 0;
@@ -260,6 +287,10 @@ class PlatformerGame {
         const spikes = [];
         const enemies = [];
         const powerups = [];
+        const crates = [];
+        const switches = [];
+        const doors = [];
+        const vines = [];
         let boss = null;
 
         let currX = 0;
@@ -267,6 +298,8 @@ class PlatformerGame {
         currX = 320;
 
         let platformId = 0;
+        let switchCounter = 0;
+
         while (currX < levelWidth - 320) {
             platformId++;
             const seed = Math.abs(Math.sin(level * 12.9898 + platformId * 78.233));
@@ -276,7 +309,6 @@ class PlatformerGame {
 
             const platWidth = isBossLevel ? 900 : Math.max(150, 240 - level * 2 + Math.floor(seed * 60));
             
-            // คำนวณระดับความสูง-ต่ำของพื้นแบบขั้นบันได/เนิน (Dynamic Terrain Elevation)
             let heightVariation = 0;
             if (!isBossLevel && platformId > 1) {
                 heightVariation = Math.sin(platformId * 0.85 + level * 0.5) * 55 + (seed - 0.5) * 40;
@@ -312,6 +344,51 @@ class PlatformerGame {
             }
 
             platforms.push(platObj);
+
+            // Puzzle Mechanics Generation
+            if (!isBossLevel && pType === 'normal' && platWidth >= 180) {
+                if (seed > 0.75 && platformId % 3 === 0) {
+                    // เถาวัลย์ขวางทาง (ใช้ Dash/Ground Pound เผา)
+                    vines.push({
+                        x: currX + platWidth * 0.4,
+                        y: platY - 60,
+                        width: 25,
+                        height: 60,
+                        isBurned: false
+                    });
+                } else if (seed < 0.35 && platformId % 4 === 0) {
+                    // ปริศนา สวิตช์ + ประตู + กล่องหิน
+                    switchCounter++;
+                    const sId = switchCounter;
+                    switches.push({
+                        id: sId,
+                        x: currX + 30,
+                        y: platY - 8,
+                        width: 36,
+                        height: 8,
+                        isPressed: false
+                    });
+
+                    doors.push({
+                        switchId: sId,
+                        x: currX + platWidth - 30,
+                        y: platY - 80,
+                        width: 20,
+                        height: 80,
+                        isOpen: false
+                    });
+
+                    crates.push({
+                        x: currX + 80,
+                        y: platY - 40,
+                        width: 34,
+                        height: 34,
+                        vx: 0,
+                        vy: 0,
+                        isGrounded: false
+                    });
+                }
+            }
 
             let hasUpperPlat = false;
             let floatY = 0;
@@ -379,7 +456,6 @@ class PlatformerGame {
         const lastPlatY = h - 35;
         platforms.push({ x: levelWidth - 320, y: lastPlatY, width: 320, height: 35, type: 'normal' });
 
-        // กำหนดบอส: ต้องเหยียบหัว 3 รอบเท่านั้น
         if (isBossLevel) {
             const bossHp = 3;
             const bossX = levelWidth / 2;
@@ -422,7 +498,6 @@ class PlatformerGame {
             };
         }
 
-        // หากเป็นด่านบอส กุญแจจะซ่อนไว้ก่อน จนกว่าจะชนะบอส
         const keyItem = {
             x: isBossLevel ? -999 : levelWidth * 0.65,
             y: isBossLevel ? -999 : h - 85,
@@ -453,7 +528,11 @@ class PlatformerGame {
             boss,
             powerups,
             keyItem,
-            goal
+            goal,
+            crates,
+            switches,
+            doors,
+            vines
         };
     }
 
@@ -555,6 +634,11 @@ class PlatformerGame {
         this.powerups = levelData.powerups;
         this.keyItem = levelData.keyItem;
         this.goal = levelData.goal;
+
+        this.crates = levelData.crates || [];
+        this.switches = levelData.switches || [];
+        this.doors = levelData.doors || [];
+        this.vines = levelData.vines || [];
 
         this.lava = {
             x: -250,
@@ -894,6 +978,141 @@ class PlatformerGame {
         if (p.x < 0) p.x = 0;
 
         p.isGrounded = false;
+
+        // Collision กับ Doors (ถ้ายังปิดอยู่)
+        this.doors.forEach(door => {
+            if (!door.isOpen) {
+                if (
+                    p.x < door.x + door.width &&
+                    p.x + p.width > door.x &&
+                    p.y < door.y + door.height &&
+                    p.y + p.height > door.y
+                ) {
+                    if (p.vx > 0 && p.x + p.width - p.vx <= door.x) p.x = door.x - p.width;
+                    else if (p.vx < 0 && p.x - p.vx >= door.x + door.width) p.x = door.x + door.width;
+                }
+            }
+        });
+
+        // Update Crates (กล่องผลัก)
+        this.crates.forEach(crate => {
+            crate.vy += this.GRAVITY;
+            crate.x += crate.vx;
+            crate.y += crate.vy;
+            crate.vx *= 0.85;
+
+            // Crate Platform Collision
+            this.platforms.forEach(plat => {
+                if (
+                    crate.x < plat.x + plat.width &&
+                    crate.x + crate.width > plat.x &&
+                    crate.y + crate.height >= plat.y &&
+                    crate.y + crate.height <= plat.y + plat.height + crate.vy &&
+                    crate.vy >= 0
+                ) {
+                    crate.vy = 0;
+                    crate.y = plat.y - crate.height;
+                }
+            });
+
+            // Player Pushing Crate
+            if (
+                p.x < crate.x + crate.width &&
+                p.x + p.width > crate.x &&
+                p.y < crate.y + crate.height &&
+                p.y + p.height > crate.y
+            ) {
+                if (p.vx > 0 && p.x + p.width - p.vx <= crate.x) {
+                    crate.vx = 2.2;
+                    p.x = crate.x - p.width;
+                } else if (p.vx < 0 && p.x - p.vx >= crate.x + crate.width) {
+                    crate.vx = -2.2;
+                    p.x = crate.x + crate.width;
+                } else if (p.vy > 0 && p.y + p.height - p.vy <= crate.y) {
+                    p.isGrounded = true;
+                    p.jumpsLeft = 2;
+                    p.vy = 0;
+                    p.y = crate.y - p.height;
+                }
+            }
+        });
+
+        // Update Vines (เถาวัลย์เผาได้ด้วย Dash/Ground Pound)
+        this.vines.forEach(vine => {
+            if (vine.isBurned) return;
+
+            if (
+                p.x < vine.x + vine.width &&
+                p.x + p.width > vine.x &&
+                p.y < vine.y + vine.height &&
+                p.y + p.height > vine.y
+            ) {
+                if (p.isDashing || p.isGroundPounding) {
+                    vine.isBurned = true;
+                    this.sfx.playBurn();
+                    this.triggerShake(8, 10);
+                    this.addParticles(vine.x + vine.width / 2, vine.y + vine.height / 2, '#ef4444', 25);
+                    this.addFloatingText(vine.x, vine.y - 10, '🔥 เผาเถาวัลย์!', '#f97316');
+                } else {
+                    if (p.vx > 0) p.x = vine.x - p.width;
+                    else if (p.vx < 0) p.x = vine.x + vine.width;
+                }
+            }
+        });
+
+        // Update Switches & Doors State
+        this.switches.forEach(sw => {
+            let pressed = false;
+
+            // Player กดปุ่ม
+            if (
+                p.x < sw.x + sw.width &&
+                p.x + p.width > sw.x &&
+                p.y + p.height >= sw.y &&
+                p.y + p.height <= sw.y + sw.height + 6
+            ) {
+                pressed = true;
+            }
+
+            // Crate กดปุ่ม
+            this.crates.forEach(c => {
+                if (
+                    c.x < sw.x + sw.width &&
+                    c.x + c.width > sw.x &&
+                    c.y + c.height >= sw.y &&
+                    c.y + c.height <= sw.y + sw.height + 6
+                ) {
+                    pressed = true;
+                }
+            });
+
+            // Enemy กดปุ่ม
+            this.enemies.forEach(e => {
+                if (
+                    !e.isDefeated &&
+                    e.x < sw.x + sw.width &&
+                    e.x + e.width > sw.x &&
+                    e.y + e.height >= sw.y &&
+                    e.y + e.height <= sw.y + sw.height + 6
+                ) {
+                    pressed = true;
+                }
+            });
+
+            if (sw.isPressed !== pressed) {
+                sw.isPressed = pressed;
+                if (pressed) this.sfx.playCheckpoint();
+            }
+
+            // Sync ประตูที่ผูกกับสวิตช์
+            this.doors.forEach(door => {
+                if (door.switchId === sw.id) {
+                    door.isOpen = sw.isPressed;
+                }
+            });
+        });
+
+        // Platform Collisions
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) {
                 if (plat.type === 'crumble') {
@@ -984,7 +1203,7 @@ class PlatformerGame {
             }
         });
 
-        // อัปเดตและตรวจจับการเหยียบหัวบอส (ต้องเหยียบ 3 ครั้ง)
+        // Boss Mechanics
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             b.x += b.vx;
@@ -1014,7 +1233,6 @@ class PlatformerGame {
                 p.y < b.y + b.height &&
                 p.y + p.height > b.y
             ) {
-                // ตรวจจับเฉพาะการกระโดดลงมาเหยียบหัวบอสจากด้านบน
                 if (p.vy > 0 && (p.y + p.height - p.vy) <= b.y + 20) {
                     b.hp--;
                     b.hitTimer = 15;
@@ -1028,7 +1246,6 @@ class PlatformerGame {
                         b.isDefeated = true;
                         store.addScore(300);
                         this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ได้รับกุญแจ!', '#facc15');
-                        // เมื่อเหยียบครบ 3 ครั้ง กุญแจจะดร็อปสปอว์นลงมาจากตัวบอส
                         if (this.keyItem) {
                             this.keyItem.x = b.x + b.width / 2 - 11;
                             this.keyItem.y = b.y - 10;
@@ -1335,40 +1552,6 @@ class PlatformerGame {
         }
     }
 
-    drawStar(cx, cy, spikes, outerRadius, innerRadius, fillStyle, strokeStyle) {
-        let rot = (Math.PI / 2) * 3;
-        let x = cx;
-        let y = cy;
-        const step = Math.PI / spikes;
-
-        this.ctx.save();
-        this.ctx.beginPath();
-        this.ctx.moveTo(cx, cy - outerRadius);
-        for (let i = 0; i < spikes; i++) {
-            x = cx + Math.cos(rot) * outerRadius;
-            y = cy + Math.sin(rot) * outerRadius;
-            this.ctx.lineTo(x, y);
-            rot += step;
-
-            x = cx + Math.cos(rot) * innerRadius;
-            y = cy + Math.sin(rot) * innerRadius;
-            this.ctx.lineTo(x, y);
-            rot += step;
-        }
-        this.ctx.lineTo(cx, cy - outerRadius);
-        this.ctx.closePath();
-
-        this.ctx.fillStyle = fillStyle;
-        this.ctx.fill();
-
-        if (strokeStyle) {
-            this.ctx.strokeStyle = strokeStyle;
-            this.ctx.lineWidth = 2.5;
-            this.ctx.stroke();
-        }
-        this.ctx.restore();
-    }
-
     drawFireStarPlayer(p) {
         const w = p.width;
         const h = p.height;
@@ -1379,61 +1562,14 @@ class PlatformerGame {
             this.ctx.scale(-1, 1);
         }
 
-        const starFloatY = -h * 1.15 + Math.sin(this.levelTime * 0.12) * 2.5;
-        this.drawStar(0, starFloatY, 5, 7, 3.5, '#facc15', '#ffffff');
-
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.beginPath();
-        this.ctx.arc(0, -h * 0.45, w * 0.56, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        this.ctx.fillStyle = '#ff781f';
-        this.ctx.strokeStyle = '#ffffff';
-        this.ctx.lineWidth = 2.5;
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(-w * 0.45, -h * 0.65);
-        this.ctx.quadraticCurveTo(-w * 0.35, -h * 0.85, -w * 0.2, -h * 0.7);
-        this.ctx.quadraticCurveTo(-w * 0.08, -h * 0.8, 0, -h * 0.68);
-        this.ctx.quadraticCurveTo(w * 0.08, -h * 0.8, w * 0.2, -h * 0.7);
-        this.ctx.quadraticCurveTo(w * 0.35, -h * 0.85, w * 0.45, -h * 0.65);
-        this.ctx.quadraticCurveTo(w * 0.55, -h * 0.15, 0, 0);
-        this.ctx.quadraticCurveTo(-w * 0.55, -h * 0.15, -w * 0.45, -h * 0.65);
-        this.ctx.closePath();
-        this.ctx.fill();
-
-        this.ctx.fillStyle = '#ffca28';
-        this.ctx.beginPath();
-        this.ctx.moveTo(-w * 0.32, -h * 0.55);
-        this.ctx.quadraticCurveTo(0, -h * 0.65, w * 0.32, -h * 0.55);
-        this.ctx.quadraticCurveTo(w * 0.38, -h * 0.18, 0, -h * 0.08);
-        this.ctx.quadraticCurveTo(-w * 0.38, -h * 0.18, -w * 0.32, -h * 0.55);
-        this.ctx.closePath();
-        this.ctx.fill();
-
-        this.ctx.fillStyle = '#ff781f';
-        this.ctx.beginPath();
-        this.ctx.arc(-w * 0.42, -h * 0.25, 4, 0, Math.PI * 2);
-        this.ctx.arc(w * 0.42, -h * 0.25, 4, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        this.ctx.fillStyle = '#212121';
-        this.ctx.beginPath();
-        this.ctx.arc(-w * 0.14, -h * 0.38, 3.2, 0, Math.PI * 2);
-        this.ctx.arc(w * 0.14, -h * 0.38, 3.2, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.beginPath();
-        this.ctx.arc(-w * 0.14 - 1, -h * 0.38 - 1, 1.2, 0, Math.PI * 2);
-        this.ctx.arc(w * 0.14 - 1, -h * 0.38 - 1, 1.2, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        this.ctx.strokeStyle = '#212121';
-        this.ctx.lineWidth = 2.2;
-        this.ctx.beginPath();
-        this.ctx.arc(0, -h * 0.32, 5.5, 0.2, Math.PI - 0.2);
-        this.ctx.stroke();
+        // เรนเดอร์ตัวละครโดยใช้ภาพ player.png
+        if (this.playerImg && this.playerImg.complete) {
+            this.ctx.drawImage(this.playerImg, -w * 0.65, -h * 1.15, w * 1.3, h * 1.2);
+        } else {
+            // สำรองหากภาพยังไม่โหลด
+            this.ctx.fillStyle = '#f97316';
+            this.ctx.fillRect(-w / 2, -h, w, h);
+        }
 
         this.ctx.restore();
     }
@@ -1596,6 +1732,80 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
+        // Render Puzzle: Switches
+        this.switches.forEach(sw => {
+            this.ctx.save();
+            this.ctx.fillStyle = sw.isPressed ? '#22c55e' : '#ef4444';
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 2;
+            const height = sw.isPressed ? 3 : sw.height;
+            const yPos = sw.isPressed ? sw.y + (sw.height - 3) : sw.y;
+            this.ctx.fillRect(sw.x, yPos, sw.width, height);
+            this.ctx.strokeRect(sw.x, yPos, sw.width, height);
+            this.ctx.restore();
+        });
+
+        // Render Puzzle: Doors
+        this.doors.forEach(door => {
+            if (!door.isOpen) {
+                this.ctx.save();
+                this.ctx.fillStyle = '#64748b';
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 3;
+                this.ctx.fillRect(door.x, door.y, door.width, door.height);
+                this.ctx.strokeRect(door.x, door.y, door.width, door.height);
+
+                // ลายประตูกลไก
+                this.ctx.strokeStyle = '#facc15';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(door.x + 4, door.y + 10);
+                this.ctx.lineTo(door.x + door.width - 4, door.y + door.height - 10);
+                this.ctx.moveTo(door.x + door.width - 4, door.y + 10);
+                this.ctx.lineTo(door.x + 4, door.y + door.height - 10);
+                this.ctx.stroke();
+
+                this.ctx.restore();
+            }
+        });
+
+        // Render Puzzle: Crates (กล่องหินผลักได้)
+        this.crates.forEach(crate => {
+            this.ctx.save();
+            this.ctx.fillStyle = '#b45309';
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 3;
+            this.ctx.fillRect(crate.x, crate.y, crate.width, crate.height);
+            this.ctx.strokeRect(crate.x, crate.y, crate.width, crate.height);
+
+            // ขอบมุมกล่อง
+            this.ctx.strokeStyle = '#f59e0b';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(crate.x + 3, crate.y + 3, crate.width - 6, crate.height - 6);
+            this.ctx.restore();
+        });
+
+        // Render Puzzle: Vines (เถาวัลย์เผาได้)
+        this.vines.forEach(vine => {
+            if (!vine.isBurned) {
+                this.ctx.save();
+                this.ctx.fillStyle = '#15803d';
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 2.5;
+                this.ctx.fillRect(vine.x, vine.y, vine.width, vine.height);
+                this.ctx.strokeRect(vine.x, vine.y, vine.width, vine.height);
+
+                // สัญลักษณ์ใบไม้/ไฟป่า
+                this.ctx.fillStyle = '#4ade80';
+                this.ctx.beginPath();
+                this.ctx.arc(vine.x + vine.width / 2, vine.y + 15, 6, 0, Math.PI * 2);
+                this.ctx.arc(vine.x + vine.width / 2, vine.y + 35, 6, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.restore();
+            }
+        });
+
         // Render Spikes
         this.spikes.forEach(spike => {
             this.ctx.save();
@@ -1618,12 +1828,11 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // Render Boss พร้อมดีไซน์ใบหน้าดุดัน (Boss Face Visuals)
+        // Render Boss
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             this.ctx.save();
 
-            // ตัวบอสหลัก
             this.ctx.fillStyle = b.hitTimer > 0 ? '#ffffff' : '#dc2626';
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 3.5;
@@ -1631,7 +1840,6 @@ class PlatformerGame {
             this.ctx.fillRect(b.x, b.y, b.width, b.height);
             this.ctx.strokeRect(b.x, b.y, b.width, b.height);
 
-            // เขาบอสสีเข้มบนหัว
             this.ctx.fillStyle = '#991b1b';
             this.ctx.beginPath();
             this.ctx.moveTo(b.x + 8, b.y);
@@ -1647,9 +1855,7 @@ class PlatformerGame {
             this.ctx.fill();
             this.ctx.stroke();
 
-            // ดวงตาดุดันสีเหลืองสด
             this.ctx.fillStyle = '#facc15';
-            // ตาซ้าย
             this.ctx.beginPath();
             this.ctx.moveTo(b.x + 10, b.y + 15);
             this.ctx.lineTo(b.x + 24, b.y + 20);
@@ -1658,7 +1864,6 @@ class PlatformerGame {
             this.ctx.fill();
             this.ctx.stroke();
 
-            // ตาขวา
             this.ctx.beginPath();
             this.ctx.moveTo(b.x + b.width - 10, b.y + 15);
             this.ctx.lineTo(b.x + b.width - 24, b.y + 20);
@@ -1667,12 +1872,10 @@ class PlatformerGame {
             this.ctx.fill();
             this.ctx.stroke();
 
-            // รูม่านตา
             this.ctx.fillStyle = '#000000';
             this.ctx.fillRect(b.x + 15, b.y + 18, 4, 5);
             this.ctx.fillRect(b.x + b.width - 19, b.y + 18, 4, 5);
 
-            // คิ้วขมวดเพิ่มความน่ากลัว
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 3;
             this.ctx.beginPath();
@@ -1682,7 +1885,6 @@ class PlatformerGame {
             this.ctx.lineTo(b.x + b.width - 26, b.y + 18);
             this.ctx.stroke();
 
-            // ปากพร้อมเขี้ยว
             this.ctx.fillStyle = '#450a0a';
             this.ctx.fillRect(b.x + 12, b.y + 32, b.width - 24, 12);
             this.ctx.strokeRect(b.x + 12, b.y + 32, b.width - 24, 12);
@@ -1698,7 +1900,6 @@ class PlatformerGame {
             this.ctx.lineTo(b.x + b.width - 23, b.y + 32);
             this.ctx.fill();
 
-            // หลอดเลือด HP ด้านบนตัวบอส
             const hpWidth = b.width;
             const currentHpW = (b.hp / b.maxHp) * hpWidth;
             this.ctx.fillStyle = '#000000';
@@ -1712,24 +1913,31 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Enemies
+        // Render Enemies (ใช้ภาพ enemy.png)
         this.enemies.forEach(e => {
             if (e.isDefeated) return;
             this.ctx.save();
 
-            const renderW = e.width * 1.2;
-            const renderH = e.height * 1.2;
+            const renderW = e.width * 1.35;
+            const renderH = e.height * 1.35;
 
             const feetX = e.x + e.width / 2;
             const feetY = e.y + e.height;
             this.ctx.translate(feetX, feetY);
 
-            this.ctx.fillStyle = '#9ca3af';
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 3;
+            if (e.vx > 0) {
+                this.ctx.scale(-1, 1);
+            }
 
-            this.ctx.fillRect(-renderW / 2, -renderH, renderW, renderH);
-            this.ctx.strokeRect(-renderW / 2, -renderH, renderW, renderH);
+            if (this.enemyImg && this.enemyImg.complete) {
+                this.ctx.drawImage(this.enemyImg, -renderW / 2, -renderH, renderW, renderH);
+            } else {
+                this.ctx.fillStyle = '#9ca3af';
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 3;
+                this.ctx.fillRect(-renderW / 2, -renderH, renderW, renderH);
+                this.ctx.strokeRect(-renderW / 2, -renderH, renderW, renderH);
+            }
 
             this.ctx.restore();
         });
@@ -1807,7 +2015,7 @@ class PlatformerGame {
             }
         });
 
-        // Render Fire Star Player Character
+        // Render Player Character
         if (p.invincibleTimer > 0 && Math.floor(p.invincibleTimer / 4) % 2 === 0) {
             // Invincible Flashing
         } else {
