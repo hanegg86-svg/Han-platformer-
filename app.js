@@ -348,7 +348,6 @@ class PlatformerGame {
             // Puzzle Mechanics Generation
             if (!isBossLevel && pType === 'normal' && platWidth >= 180) {
                 if (seed > 0.75 && platformId % 3 === 0) {
-                    // เถาวัลย์ขวางทาง (ใช้ Dash/Ground Pound เผา)
                     vines.push({
                         x: currX + platWidth * 0.4,
                         y: platY - 60,
@@ -357,7 +356,6 @@ class PlatformerGame {
                         isBurned: false
                     });
                 } else if (seed < 0.35 && platformId % 4 === 0) {
-                    // ปริศนา สวิตช์ + ประตู + กล่องหิน
                     switchCounter++;
                     const sId = switchCounter;
                     switches.push({
@@ -1331,7 +1329,7 @@ class PlatformerGame {
                 this.handlePlayerDamage();
             }
         });
-        this.projectiles = this.projectiles.filter(pj => !pj.hit && pj.x > this.cameraX - 50 && pj.x < this.cameraX + this.canvas.width + 50);
+        this.projectiles = this.projectiles.filter(pj => !pj.hit && pj.x > this.cameraX - 50 && pj.x < this.canvas.width + 50);
 
         if (this.keyItem && !this.keyItem.collected) {
             if (
@@ -1562,9 +1560,9 @@ class PlatformerGame {
             this.ctx.scale(-1, 1);
         }
 
-        // เรนเดอร์ตัวละครโดยใช้ภาพ player.png
+        // เรนเดอร์ตัวละครโดยขยายขนาดเฉพาะการวาดภาพ (Visual Only ~1.65 เท่า) โดยวางส้นเท้าของภาพให้ตรงกับเท้าจริง
         if (this.playerImg && this.playerImg.complete) {
-            this.ctx.drawImage(this.playerImg, -w * 0.65, -h * 1.15, w * 1.3, h * 1.2);
+            this.ctx.drawImage(this.playerImg, -w * 1.05, -h * 1.9, w * 2.1, h * 1.9);
         } else {
             // สำรองหากภาพยังไม่โหลด
             this.ctx.fillStyle = '#f97316';
@@ -1755,7 +1753,6 @@ class PlatformerGame {
                 this.ctx.fillRect(door.x, door.y, door.width, door.height);
                 this.ctx.strokeRect(door.x, door.y, door.width, door.height);
 
-                // ลายประตูกลไก
                 this.ctx.strokeStyle = '#facc15';
                 this.ctx.lineWidth = 2;
                 this.ctx.beginPath();
@@ -1769,7 +1766,7 @@ class PlatformerGame {
             }
         });
 
-        // Render Puzzle: Crates (กล่องหินผลักได้)
+        // Render Puzzle: Crates
         this.crates.forEach(crate => {
             this.ctx.save();
             this.ctx.fillStyle = '#b45309';
@@ -1778,14 +1775,13 @@ class PlatformerGame {
             this.ctx.fillRect(crate.x, crate.y, crate.width, crate.height);
             this.ctx.strokeRect(crate.x, crate.y, crate.width, crate.height);
 
-            // ขอบมุมกล่อง
             this.ctx.strokeStyle = '#f59e0b';
             this.ctx.lineWidth = 2;
             this.ctx.strokeRect(crate.x + 3, crate.y + 3, crate.width - 6, crate.height - 6);
             this.ctx.restore();
         });
 
-        // Render Puzzle: Vines (เถาวัลย์เผาได้)
+        // Render Puzzle: Vines
         this.vines.forEach(vine => {
             if (!vine.isBurned) {
                 this.ctx.save();
@@ -1795,7 +1791,6 @@ class PlatformerGame {
                 this.ctx.fillRect(vine.x, vine.y, vine.width, vine.height);
                 this.ctx.strokeRect(vine.x, vine.y, vine.width, vine.height);
 
-                // สัญลักษณ์ใบไม้/ไฟป่า
                 this.ctx.fillStyle = '#4ade80';
                 this.ctx.beginPath();
                 this.ctx.arc(vine.x + vine.width / 2, vine.y + 15, 6, 0, Math.PI * 2);
@@ -1913,7 +1908,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Enemies (ใช้ภาพ enemy.png)
+        // Render Enemies
         this.enemies.forEach(e => {
             if (e.isDefeated) return;
             this.ctx.save();
