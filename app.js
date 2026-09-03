@@ -32,6 +32,21 @@ class SoundFX {
         osc.stop(this.ctx.currentTime + 0.12);
     }
 
+    playSpring() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.22);
+        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.22);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.22);
+    }
+
     playCoin() {
         if (!this.ctx || !store.getState().soundEnabled) return;
         const osc = this.ctx.createOscillator();
@@ -181,7 +196,7 @@ class PlatformerGame {
         
         // Game Entities
         this.player = null;
-        this.levelWidth = 1200;
+        this.levelWidth = 12000;
         this.platforms = [];
         this.coins = [];
         this.spikes = [];
@@ -191,10 +206,9 @@ class PlatformerGame {
         this.boss = null;
         this.projectiles = [];
         this.spells = [];
-        this.checkpoint = null;
+        this.checkpoints = [];
         this.spawnPoint = { x: 50, y: 0 };
         this.lava = null;
-        this.keyItem = null;
         this.goal = null;
 
         // Puzzle Entities
@@ -222,7 +236,7 @@ class PlatformerGame {
         this.currentTheme = 'grass';
 
         this.levelTime = 0;
-        this.targetTime = 15;
+        this.targetTime = 70;
         this.bannerTimer = 0;
         this.bannerText = '';
         this.isGameCleared = false;
@@ -315,55 +329,58 @@ class PlatformerGame {
         if (level >= 11 && level <= 25) theme = 'yoyle';
         if (level >= 26) theme = 'volcano';
 
-        const lavaSpeed = Math.min(1.8, 0.4 + (level - 1) * 0.035);
-        const targetTime = Math.max(15, 30 - Math.floor((level - 1) / 3));
+        // ปรับสปีดลาวาให้ช้าลงตามความเร็ววิ่งใหม่ของผู้เล่น
+        const lavaSpeed = Math.min(1.0, 0.22 + (level - 1) * 0.015);
+        // เพิ่มเวลาเป้าหมาย 3 ดาวสำหรับด่านที่ยาวขึ้น 4 เท่า
+        const targetTime = Math.max(60, 95 - Math.floor((level - 1) / 2));
 
         const allowedTypes = ['normal'];
         if (level >= 2) allowedTypes.push('bounce');
         if (level >= 5) allowedTypes.push('ice');
-        if (level >= 10) allowedTypes.push('crumble');
-        if (level >= 15) allowedTypes.push('conveyor_right', 'conveyor_left');
-        if (level >= 22) allowedTypes.push('phase');
-        if (level >= 28) allowedTypes.push('moving');
+        if (level >= 8) allowedTypes.push('crumble');
+        if (level >= 13) allowedTypes.push('conveyor_right', 'conveyor_left');
+        if (level >= 18) allowedTypes.push('phase');
+        if (level >= 22) allowedTypes.push('moving');
 
         const isBossLevel = (level % 10 === 0);
-        const levelWidth = Math.min(4500, Math.floor(w * (3.0 + level * 0.25)));
+        // ขยายความยาวด่านเพิ่มขึ้นประมาณ 4 เท่า (จากเดิม ~3500px เป็น ~13000-16000px)
+        const levelWidth = isBossLevel ? 11000 : Math.min(16000, Math.floor(w * (12.0 + level * 0.4)));
 
         const platforms = [];
         const coins = [];
         const spikes = [];
+        const springs = [];
         const enemies = [];
         const powerups = [];
         const crates = [];
         const switches = [];
         const doors = [];
         const vines = [];
+        const checkpoints = [];
         let boss = null;
 
         let currX = 0;
-        platforms.push({ x: 0, y: h - 35, width: 320, height: 35, type: 'normal' });
-        currX = 320;
+        platforms.push({ x: 0, y: h - 35, width: 340, height: 35, type: 'normal' });
+        currX = 340;
 
         let platformId = 0;
         let switchCounter = 0;
 
-        while (currX < levelWidth - 320) {
+        while (currX < levelWidth - 360) {
             platformId++;
-            const seed = Math.abs(Math.sin(level * 12.9898 + platformId * 78.233));
+            const seed = Math.abs(Math.sin(level * 14.123 + platformId * 78.233));
             
-            const gapWidth = isBossLevel ? 0 : Math.min(105, 50 + Math.floor(seed * 40) + Math.min(level, 15));
+            // ระยะห่างและลูกเล่นกระโดด
+            const gapWidth = Math.min(95, 45 + Math.floor(seed * 35) + Math.min(level, 10));
             currX += gapWidth;
 
-            const platWidth = isBossLevel ? 900 : Math.max(150, 240 - level * 2 + Math.floor(seed * 60));
+            const platWidth = Math.max(130, 220 - level * 1.5 + Math.floor(seed * 60));
             
-            let heightVariation = 0;
-            if (!isBossLevel && platformId > 1) {
-                heightVariation = Math.sin(platformId * 0.85 + level * 0.5) * 55 + (seed - 0.5) * 40;
-            }
-            const platY = isBossLevel ? h - 35 : Math.max(h - 220, Math.min(h - 35, Math.floor((h - 35) + heightVariation)));
+            let heightVariation = Math.sin(platformId * 0.85 + level * 0.5) * 55 + (seed - 0.5) * 35;
+            const platY = Math.max(h - 220, Math.min(h - 35, Math.floor((h - 35) + heightVariation)));
 
             let pType = 'normal';
-            if (platformId > 1 && !isBossLevel) {
+            if (platformId > 1) {
                 const typeIdx = Math.floor(seed * allowedTypes.length);
                 pType = allowedTypes[typeIdx] || 'normal';
             }
@@ -385,16 +402,73 @@ class PlatformerGame {
                 platObj.isDestroyed = false;
                 platObj.respawnTimer = 0;
             } else if (pType === 'moving') {
-                platObj.vx = (platformId % 2 === 0 ? 1 : -1) * (0.8 + (level * 0.02));
-                platObj.minX = Math.max(0, currX - 50);
-                platObj.maxX = Math.min(levelWidth, currX + platWidth + 50);
+                platObj.vx = (platformId % 2 === 0 ? 1 : -1) * (0.65 + (level * 0.015));
+                platObj.minX = Math.max(0, currX - 45);
+                platObj.maxX = Math.min(levelWidth, currX + platWidth + 45);
             }
 
             platforms.push(platObj);
 
-            // Puzzle Mechanics Generation
-            if (!isBossLevel && pType === 'normal' && platWidth >= 180) {
-                if (seed > 0.75 && platformId % 3 === 0) {
+            // แท่นสปริงดีดตัวข้ามสิ่งกีดขวาง
+            if (seed > 0.82 && platWidth >= 160 && pType === 'normal') {
+                springs.push({
+                    x: currX + platWidth * 0.5 - 12,
+                    y: platY - 10,
+                    width: 24,
+                    height: 10
+                });
+            }
+
+            // กับดักหนามบนแท่น
+            if (seed > 0.60 && platWidth >= 170 && pType === 'normal') {
+                const spikeW = Math.min(42, platWidth * 0.25);
+                spikes.push({
+                    x: currX + platWidth * 0.35,
+                    y: platY - 16,
+                    width: spikeW,
+                    height: 16
+                });
+            }
+
+            // ศัตรูหลากหลายแบบ (เดินดิน, บิน, เกราะหนา)
+            if (platformId % 2 === 0 && platWidth >= 150) {
+                const isFlying = seed > 0.68;
+                const isArmored = !isFlying && seed < 0.28 && level >= 4;
+                const isRanged = !isFlying && !isArmored && seed > 0.45 && level >= 6;
+
+                enemies.push({
+                    x: currX + 25,
+                    y: isFlying ? platY - 75 : platY - 32,
+                    baseY: isFlying ? platY - 75 : platY - 32,
+                    width: 32,
+                    height: 32,
+                    vx: (isFlying || isRanged) ? 0 : (0.65 + level * 0.015),
+                    minX: currX,
+                    maxX: currX + platWidth - 32,
+                    isFlying,
+                    isArmored,
+                    isRanged,
+                    flyTimer: platformId,
+                    shootTimer: 0,
+                    isFrozen: false,
+                    freezeTimer: 0,
+                    isDefeated: false
+                });
+            }
+
+            // เหรียญทอง
+            if (platformId % 2 === 0) {
+                coins.push({
+                    x: currX + platWidth / 2,
+                    y: platY - 26,
+                    radius: 9,
+                    collected: false
+                });
+            }
+
+            // เถาวัลย์และประตูกล
+            if (pType === 'normal' && platWidth >= 180) {
+                if (seed > 0.76 && platformId % 4 === 0) {
                     vines.push({
                         x: currX + platWidth * 0.4,
                         y: platY - 60,
@@ -402,12 +476,12 @@ class PlatformerGame {
                         height: 60,
                         isBurned: false
                     });
-                } else if (seed < 0.35 && platformId % 4 === 0) {
+                } else if (seed < 0.22 && platformId % 5 === 0) {
                     switchCounter++;
                     const sId = switchCounter;
                     switches.push({
                         id: sId,
-                        x: currX + 30,
+                        x: currX + 20,
                         y: platY - 8,
                         width: 36,
                         height: 8,
@@ -416,7 +490,7 @@ class PlatformerGame {
 
                     doors.push({
                         switchId: sId,
-                        x: currX + platWidth - 30,
+                        x: currX + platWidth - 25,
                         y: platY - 80,
                         width: 20,
                         height: 80,
@@ -424,7 +498,7 @@ class PlatformerGame {
                     });
 
                     crates.push({
-                        x: currX + 80,
+                        x: currX + 70,
                         y: platY - 40,
                         width: 34,
                         height: 34,
@@ -435,130 +509,54 @@ class PlatformerGame {
                 }
             }
 
-            let hasUpperPlat = false;
-            let floatY = 0;
-            let floatWidth = 0;
-            if (seed > 0.52 && !isBossLevel && platWidth >= 160) {
-                hasUpperPlat = true;
-                floatWidth = Math.max(90, platWidth * 0.55);
-                floatY = platY - 85 - Math.floor(seed * 20);
-                platforms.push({
-                    x: currX + (platWidth - floatWidth) / 2,
-                    y: floatY,
-                    width: floatWidth,
-                    height: 20,
-                    type: 'normal'
-                });
-
-                coins.push({
-                    x: currX + platWidth / 2,
-                    y: floatY - 22,
-                    radius: 9,
-                    collected: false
-                });
-            }
-
-            if (platformId % 2 === 0 && !hasUpperPlat) {
-                coins.push({
-                    x: currX + platWidth / 2,
-                    y: platY - 22,
-                    radius: 9,
-                    collected: false
-                });
-            }
-
-            let hasSpike = false;
-            if (level >= 3 && seed > 0.65 && !isBossLevel && pType === 'normal' && platWidth >= 180) {
-                hasSpike = true;
-                const spikeW = Math.min(48, platWidth * 0.25);
-                spikes.push({
-                    x: currX + platWidth * 0.38,
-                    y: platY - 16,
-                    width: spikeW,
-                    height: 16
-                });
-            }
-
-            if (level >= 2 && seed > 0.52 && !isBossLevel && pType === 'normal' && platWidth >= 150 && !hasSpike) {
-                const isRanged = (level >= 12 && platformId % 4 === 0);
-                enemies.push({
-                    x: currX + 15,
-                    y: platY - 32,
-                    width: 32,
-                    height: 32,
-                    vx: isRanged ? 0 : (0.75 + level * 0.018),
-                    minX: currX,
-                    maxX: currX + platWidth - 32,
-                    isDefeated: false,
-                    isRanged: isRanged,
-                    shootTimer: 0,
-                    isFrozen: false,
-                    freezeTimer: 0
-                });
-            }
-
             currX += platWidth;
         }
 
         const lastPlatY = h - 35;
-        platforms.push({ x: levelWidth - 320, y: lastPlatY, width: 320, height: 35, type: 'normal' });
+        platforms.push({ x: levelWidth - 360, y: lastPlatY, width: 360, height: 35, type: 'normal' });
 
+        // จุดเซฟ 3 จุดตลอดระยะทางของด่านที่ยาว 4 เท่า
+        [0.25, 0.50, 0.75].forEach((ratio) => {
+            const cpX = levelWidth * ratio;
+            const nearPlat = platforms.find(p => p.x >= cpX) || { x: cpX, y: h - 35 };
+            checkpoints.push({
+                x: nearPlat.x + 30,
+                y: nearPlat.y - 32,
+                width: 20,
+                height: 32,
+                active: false
+            });
+        });
+
+        // บอสวิ่งนำหน้า (เฉพาะด่านบอส)
         if (isBossLevel) {
-            const bossHp = 3;
-            const bossX = levelWidth / 2;
+            const bossHp = 6 + Math.floor(level / 10) * 2;
             boss = {
-                x: bossX,
+                x: 360, // เริ่มต้นวิ่งนำหน้าผู้เล่น
                 y: h - 90,
-                width: 60,
-                height: 55,
+                width: 58,
+                height: 56,
                 hp: bossHp,
                 maxHp: bossHp,
-                vx: 1.4 + (level * 0.015),
-                minX: bossX - 220,
-                maxX: bossX + 220,
+                vx: 2.7,
+                vy: 0,
+                isGrounded: false,
+                jumpTimer: 0,
                 shootTimer: 0,
                 isDefeated: false,
-                hitTimer: 0
+                hitTimer: 0,
+                isSlowed: false,
+                slowTimer: 0
             };
         }
 
-        if (level % 2 === 0 || level > 25) {
-            const pType = level % 3 === 0 ? 'shield' : (level % 3 === 1 ? 'magnet' : 'boost');
-            powerups.push({
-                x: levelWidth * 0.35,
-                y: h - 85,
-                type: pType,
-                collected: false,
-                radius: 12
-            });
-        }
-
-        let checkpoint = null;
-        if (level >= 4 && !isBossLevel) {
-            const midPlat = platforms[Math.floor(platforms.length / 2)] || { x: levelWidth * 0.45, y: h - 35 };
-            checkpoint = {
-                x: midPlat.x + midPlat.width / 2 - 10,
-                y: midPlat.y - 30,
-                width: 20,
-                height: 30,
-                active: false
-            };
-        }
-
-        const keyItem = {
-            x: isBossLevel ? -999 : levelWidth * 0.65,
-            y: isBossLevel ? -999 : h - 85,
-            width: 22,
-            height: 22,
-            collected: false
-        };
-
+        // ประตูเส้นชัย (เปิดเสมอในด่านธรรมดา ส่วนด่านบอสจะเปิดเมื่อโค่นบอสได้)
         const goal = {
             x: levelWidth - 90,
             y: lastPlatY - 45,
             width: 40,
             height: 45,
-            isLocked: true
+            isLocked: isBossLevel // บอสเลเวลล็อกไว้ก่อน ด่านธรรมดาผ่านได้เลย
         };
 
         return {
@@ -566,15 +564,14 @@ class PlatformerGame {
             targetTime,
             lavaSpeed,
             levelWidth,
-            checkpoint,
+            checkpoints,
             platforms,
             coins,
             spikes,
-            springs: [],
+            springs,
             enemies,
             boss,
             powerups,
-            keyItem,
             goal,
             crates,
             switches,
@@ -634,7 +631,7 @@ class PlatformerGame {
             height: 42,
             vx: 0,
             vy: 0,
-            speed: 4.2, // ปรับความเร็ววิ่งอัตโนมัติให้ต่อเนื่องและคล่องตัว
+            speed: 2.75, // ปรับความเร็ววิ่งอัตโนมัติให้ช้าลงเพื่อความแม่นยำ
             jumpPower: -6.8,
             isGrounded: false,
             
@@ -670,7 +667,7 @@ class PlatformerGame {
 
             trail: [],
 
-            facing: 'right', // ตัวละครวิ่งไปข้างหน้าเสมอ
+            facing: 'right',
             walkTimer: 0,
             idleTimer: 0,
             rotation: 0,
@@ -680,15 +677,14 @@ class PlatformerGame {
 
         this.currentTheme = levelData.theme;
         this.targetTime = levelData.targetTime;
-        this.checkpoint = levelData.checkpoint;
+        this.checkpoints = levelData.checkpoints || [];
         this.platforms = levelData.platforms;
         this.coins = levelData.coins;
         this.spikes = levelData.spikes;
-        this.springs = levelData.springs;
+        this.springs = levelData.springs || [];
         this.enemies = levelData.enemies;
         this.boss = levelData.boss;
         this.powerups = levelData.powerups;
-        this.keyItem = levelData.keyItem;
         this.goal = levelData.goal;
 
         this.crates = levelData.crates || [];
@@ -859,7 +855,7 @@ class PlatformerGame {
 
         p.mp -= cost;
         p.magicCooldown = 16;
-        const dir = 1; // ยิงไปด้านหน้าของทิศทางวิ่งเสมอ
+        const dir = 1;
 
         if (spellType === 'fire') {
             this.sfx.playMagicFire();
@@ -867,10 +863,10 @@ class PlatformerGame {
                 type: 'fire',
                 x: p.x + p.width + 5,
                 y: p.y + p.height * 0.4,
-                vx: dir * 8.5,
+                vx: dir * 7.8,
                 vy: 0,
                 radius: 12,
-                life: 75
+                life: 90
             });
             this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#f97316', 10);
         } else if (spellType === 'ice') {
@@ -879,20 +875,21 @@ class PlatformerGame {
                 type: 'ice',
                 x: p.x + p.width + 5,
                 y: p.y + p.height * 0.4,
-                vx: dir * 7.5,
+                vx: dir * 7.0,
                 vy: 0,
                 radius: 10,
-                life: 75
+                life: 90
             });
             this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 10);
         } else if (spellType === 'thunder') {
             this.sfx.playMagicThunder();
-            const strikeX = p.x + 140;
+            // ถ้ามีบอส ให้ฟาดลงที่ตำแหน่งบอสทันที
+            const strikeX = (this.boss && !this.boss.isDefeated) ? this.boss.x + this.boss.width / 2 : p.x + 150;
             this.spells.push({
                 type: 'thunder',
                 x: strikeX,
                 y: 0,
-                width: 44,
+                width: 46,
                 height: this.canvas.height,
                 life: 14,
                 hasHit: false
@@ -961,7 +958,6 @@ class PlatformerGame {
         const p = this.player;
         this.levelTime++;
 
-        // Regenerate MP naturally
         p.mp = Math.min(p.maxMp, p.mp + p.mpRegen);
         if (p.magicCooldown > 0) p.magicCooldown--;
 
@@ -1027,20 +1023,23 @@ class PlatformerGame {
         });
         this.floatingTexts = this.floatingTexts.filter(ft => ft.alpha > 0);
 
-        if (this.checkpoint && !this.checkpoint.active) {
-            if (
-                p.x < this.checkpoint.x + this.checkpoint.width &&
-                p.x + p.width > this.checkpoint.x &&
-                p.y < this.checkpoint.y + this.checkpoint.height &&
-                p.y + p.height > this.checkpoint.y
-            ) {
-                this.checkpoint.active = true;
-                this.spawnPoint = { x: this.checkpoint.x, y: this.checkpoint.y - p.height + 10 };
-                this.sfx.playCheckpoint();
-                this.addParticles(this.checkpoint.x, this.checkpoint.y, '#22c55e', 20);
-                this.addFloatingText(this.checkpoint.x - 20, this.checkpoint.y - 15, 'จุดเซฟทำงาน!', '#22c55e');
+        // ตรวจจับจุด Checkpoint ทั้งหมดในด่าน
+        this.checkpoints.forEach(cp => {
+            if (!cp.active) {
+                if (
+                    p.x < cp.x + cp.width &&
+                    p.x + p.width > cp.x &&
+                    p.y < cp.y + cp.height &&
+                    p.y + p.height > cp.y
+                ) {
+                    cp.active = true;
+                    this.spawnPoint = { x: cp.x, y: cp.y - p.height + 10 };
+                    this.sfx.playCheckpoint();
+                    this.addParticles(cp.x, cp.y, '#22c55e', 20);
+                    this.addFloatingText(cp.x - 20, cp.y - 15, 'จุดเซฟทำงาน!', '#22c55e');
+                }
             }
-        }
+        });
 
         if (this.lava) {
             this.lava.x += this.lava.speed;
@@ -1054,7 +1053,7 @@ class PlatformerGame {
 
         const currentSpeed = p.boostTimer > 0 ? p.speed * 1.5 : p.speed;
 
-        // Auto-Runner Forward Movement
+        // Auto-Runner Movement
         if (p.isGroundPounding) {
             p.vx = 0;
             p.vy = 14.0;
@@ -1064,7 +1063,7 @@ class PlatformerGame {
             p.dashTimer--;
             if (p.dashTimer <= 0) p.isDashing = false;
         } else {
-            p.vx = currentSpeed; // วิ่งไปข้างหน้าอัตโนมัติตลอดเวลา
+            p.vx = currentSpeed;
             p.facing = 'right';
             p.vy += this.GRAVITY;
         }
@@ -1086,10 +1085,9 @@ class PlatformerGame {
         p.trail = p.trail.filter(t => t.alpha > 0);
 
         if (p.x < 0) p.x = 0;
-
         p.isGrounded = false;
 
-        // Collision กับ Doors (ถ้ายังปิดอยู่)
+        // Collision กับ Doors (ถ้าปิดอยู่)
         this.doors.forEach(door => {
             if (!door.isOpen) {
                 if (
@@ -1104,14 +1102,13 @@ class PlatformerGame {
             }
         });
 
-        // Update Crates (กล่องผลัก)
+        // Crates (กล่องผลัก)
         this.crates.forEach(crate => {
             crate.vy += this.GRAVITY;
             crate.x += crate.vx;
             crate.y += crate.vy;
             crate.vx *= 0.85;
 
-            // Crate Platform Collision
             this.platforms.forEach(plat => {
                 if (
                     crate.x < plat.x + plat.width &&
@@ -1125,7 +1122,6 @@ class PlatformerGame {
                 }
             });
 
-            // Player Pushing Crate
             if (
                 p.x < crate.x + crate.width &&
                 p.x + p.width > crate.x &&
@@ -1133,7 +1129,7 @@ class PlatformerGame {
                 p.y + p.height > crate.y
             ) {
                 if (p.vx > 0 && p.x + p.width - p.vx <= crate.x) {
-                    crate.vx = 2.4;
+                    crate.vx = 2.2;
                     p.x = crate.x - p.width;
                 } else if (p.vy > 0 && p.y + p.height - p.vy <= crate.y) {
                     p.isGrounded = true;
@@ -1144,7 +1140,7 @@ class PlatformerGame {
             }
         });
 
-        // Update Vines (เถาวัลย์เผาได้ด้วย Dash / Ground Pound หรือเวทเพลิง)
+        // เถาวัลย์
         this.vines.forEach(vine => {
             if (vine.isBurned) return;
 
@@ -1166,11 +1162,10 @@ class PlatformerGame {
             }
         });
 
-        // Update Switches & Doors State
+        // สวิตช์และประตู
         this.switches.forEach(sw => {
             let pressed = false;
 
-            // Player กดปุ่ม
             if (
                 p.x < sw.x + sw.width &&
                 p.x + p.width > sw.x &&
@@ -1180,7 +1175,6 @@ class PlatformerGame {
                 pressed = true;
             }
 
-            // Crate กดปุ่ม
             this.crates.forEach(c => {
                 if (
                     c.x < sw.x + sw.width &&
@@ -1192,25 +1186,11 @@ class PlatformerGame {
                 }
             });
 
-            // Enemy กดปุ่ม
-            this.enemies.forEach(e => {
-                if (
-                    !e.isDefeated &&
-                    e.x < sw.x + sw.width &&
-                    e.x + e.width > sw.x &&
-                    e.y + e.height >= sw.y &&
-                    e.y + e.height <= sw.y + sw.height + 6
-                ) {
-                    pressed = true;
-                }
-            });
-
             if (sw.isPressed !== pressed) {
                 sw.isPressed = pressed;
                 if (pressed) this.sfx.playCheckpoint();
             }
 
-            // Sync ประตูที่ผูกกับสวิตช์
             this.doors.forEach(door => {
                 if (door.switchId === sw.id) {
                     door.isOpen = sw.isPressed;
@@ -1218,7 +1198,26 @@ class PlatformerGame {
             });
         });
 
-        // Platform Collisions
+        // Springs (สปริงดีดตัว)
+        this.springs.forEach(spg => {
+            if (
+                p.x < spg.x + spg.width &&
+                p.x + p.width > spg.x &&
+                p.y + p.height >= spg.y &&
+                p.y + p.height <= spg.y + spg.height + 8 &&
+                p.vy >= 0
+            ) {
+                p.vy = -12.5;
+                p.isGrounded = false;
+                p.jumpsLeft = 1;
+                this.sfx.playSpring();
+                this.triggerShake(6, 10);
+                this.addParticles(spg.x + spg.width / 2, spg.y, '#38bdf8', 15);
+                this.addFloatingText(spg.x, spg.y - 15, '🚀 SPRING BOUNCE!', '#38bdf8');
+            }
+        });
+
+        // Platforms Collision
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) {
                 if (plat.type === 'crumble') {
@@ -1304,68 +1303,114 @@ class PlatformerGame {
             }
         });
 
-        // Boss Mechanics
+        // ----------------------------------------------------
+        // Boss Mechanics (บอสวิ่งนำหน้า กระโดดหลบ และยิงสวนกลับ)
+        // ----------------------------------------------------
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
-            b.x += b.vx;
-            if (b.x <= b.minX || b.x + b.width >= b.maxX) {
-                b.vx *= -1;
+
+            // รักษาระยะห่างนำหน้าผู้เล่น 250 - 320 px
+            const targetDist = 280;
+            const currentDist = b.x - p.x;
+
+            let baseSpeed = p.speed;
+            if (currentDist < targetDist - 30) {
+                baseSpeed = p.speed * 1.35; // บอสเร่งหนีไม่ให้ผู้เล่นชนง่ายๆ
+            } else if (currentDist > targetDist + 40) {
+                baseSpeed = p.speed * 0.75; // บอสชะลอรอให้อยู่ในหน้าจอ
             }
+
+            if (b.isSlowed) {
+                baseSpeed *= 0.5;
+                b.slowTimer--;
+                if (b.slowTimer <= 0) b.isSlowed = false;
+            }
+
+            b.vx = baseSpeed;
+            b.vy += this.GRAVITY;
+
+            // Boss Platform Physics
+            b.isGrounded = false;
+            this.platforms.forEach(plat => {
+                if (plat.isDestroyed) return;
+                if (
+                    b.x < plat.x + plat.width &&
+                    b.x + b.width > plat.x &&
+                    b.y + b.height >= plat.y &&
+                    b.y + b.height <= plat.y + plat.height + b.vy &&
+                    b.vy >= 0
+                ) {
+                    b.isGrounded = true;
+                    b.vy = 0;
+                    b.y = plat.y - b.height;
+                }
+            });
+
+            // บอสกระโดดอัตโนมัติเมื่อเจอร่องหลุมข้างหน้า หรือสุ่มกระโดด
+            b.jumpTimer++;
+            if (b.isGrounded && b.jumpTimer >= 80) {
+                b.jumpTimer = 0;
+                b.vy = -7.5;
+                this.sfx.playJump();
+                this.addParticles(b.x + b.width / 2, b.y + b.height, '#dc2626', 10);
+            }
+
+            // บอสกระโดดหลบกระสุนเวทมนตร์ของผู้เล่น (Reactive Jump Evade)
+            this.spells.forEach(sp => {
+                if (sp.type === 'fire' || sp.type === 'ice') {
+                    const dist = b.x - sp.x;
+                    if (dist > 0 && dist < 140 && b.isGrounded && Math.random() < 0.65) {
+                        b.vy = -8.2;
+                        b.isGrounded = false;
+                        this.addFloatingText(b.x, b.y - 15, '💨 EVADE JUMP!', '#facc15');
+                    }
+                }
+            });
+
+            b.x += b.vx;
+            b.y += b.vy;
 
             if (b.hitTimer > 0) b.hitTimer--;
 
+            // บอสยิงกระสุนสวนกลับมาหาผู้เล่น
             b.shootTimer++;
-            if (b.shootTimer >= 70) {
+            if (b.shootTimer >= 85) {
                 b.shootTimer = 0;
                 this.projectiles.push({
-                    x: b.x + b.width / 2,
-                    y: b.y + b.height / 2,
-                    vx: (p.x < b.x) ? -2.6 : 2.6,
-                    vy: -1.0,
+                    x: b.x,
+                    y: b.y + b.height * 0.45,
+                    vx: -(p.speed + 3.2), // ยิงพุ่งสวนทิศทางวิ่ง
+                    vy: (Math.random() - 0.5) * 1.5,
                     radius: 7,
-                    color: '#f97316',
+                    color: '#dc2626',
                     isParried: false
                 });
+                this.sfx.playMagicFire();
+                this.addParticles(b.x, b.y + b.height * 0.45, '#dc2626', 8);
             }
 
+            // ผู้เล่นชนบอสโดยตรง
             if (
                 p.x < b.x + b.width &&
                 p.x + p.width > b.x &&
                 p.y < b.y + b.height &&
                 p.y + p.height > b.y
             ) {
-                if (p.vy > 0 && (p.y + p.height - p.vy) <= b.y + 20) {
-                    b.hp--;
-                    b.hitTimer = 15;
-                    p.vy = -9.5;
-                    p.mp = Math.min(p.maxMp, p.mp + 25);
-                    this.sfx.playHit();
-                    this.triggerShake(12, 16);
-                    this.hitFreezeTimer = 6;
-                    this.addParticles(b.x + b.width / 2, b.y + b.height / 2, '#ef4444', 22);
-
-                    if (b.hp <= 0) {
-                        b.isDefeated = true;
-                        store.addScore(300);
-                        this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ได้รับกุญแจ!', '#facc15');
-                        if (this.keyItem) {
-                            this.keyItem.x = b.x + b.width / 2 - 11;
-                            this.keyItem.y = b.y - 10;
-                        }
-                    } else {
-                        this.addFloatingText(b.x, b.y - 20, `💥 เหยียบแล้ว! HP เหลือ: ${b.hp}/${b.maxHp}`, '#ef4444');
-                    }
-                } else {
-                    this.handlePlayerDamage();
-                }
+                this.handlePlayerDamage();
             }
         }
 
-        // Enemies Update
+        // ศัตรูทั่วไป
         this.enemies.forEach(enemy => {
             if (enemy.isDefeated) return;
 
-            // Handle Frozen State (Platform Effect)
+            // การขยับของศัตรูบิน
+            if (enemy.isFlying) {
+                enemy.flyTimer += 0.05;
+                enemy.y = enemy.baseY + Math.sin(enemy.flyTimer) * 22;
+            }
+
+            // สถานะแช่แข็ง
             if (enemy.isFrozen) {
                 enemy.freezeTimer--;
                 if (enemy.freezeTimer <= 0) {
@@ -1388,19 +1433,19 @@ class PlatformerGame {
                 return;
             }
 
-            if (!enemy.isRanged) {
+            if (!enemy.isFlying && !enemy.isRanged) {
                 enemy.x += enemy.vx;
                 if (enemy.x <= enemy.minX || enemy.x + enemy.width >= enemy.maxX) {
                     enemy.vx *= -1;
                 }
-            } else {
+            } else if (enemy.isRanged) {
                 enemy.shootTimer = (enemy.shootTimer || 0) + 1;
-                if (enemy.shootTimer >= 100) {
+                if (enemy.shootTimer >= 110) {
                     enemy.shootTimer = 0;
                     this.projectiles.push({
-                        x: enemy.x + enemy.width / 2,
+                        x: enemy.x,
                         y: enemy.y + enemy.height / 2,
-                        vx: -2.5,
+                        vx: -3.0,
                         vy: 0,
                         radius: 5,
                         color: '#ef4444',
@@ -1409,24 +1454,29 @@ class PlatformerGame {
                 }
             }
 
-            const isPlayerBelowPlatform = (p.y + p.height) > (enemy.y + enemy.height + 4);
+            // ชนศัตรู
             if (
-                !isPlayerBelowPlatform &&
                 p.x < enemy.x + enemy.width &&
                 p.x + p.width > enemy.x &&
                 p.y < enemy.y + enemy.height &&
                 p.y + p.height > enemy.y
             ) {
                 if (p.vy > 0 && (p.y + p.height - p.vy) <= enemy.y + 12) {
-                    enemy.isDefeated = true;
-                    p.vy = -8.5;
-                    p.mp = Math.min(p.maxMp, p.mp + 15);
-                    store.addScore(50);
-                    this.sfx.playHit();
-                    this.triggerShake(10, 14);
-                    this.hitFreezeTimer = 4;
-                    this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 18);
-                    this.addFloatingText(enemy.x, enemy.y, '+50 (+15 MP)', '#38bdf8');
+                    // ถ้าเป็นศัตรูเกราะหนา และยังไม่ถูกแช่แข็ง จะเหยียบไม่เข้า
+                    if (enemy.isArmored) {
+                        this.handlePlayerDamage();
+                        this.addFloatingText(enemy.x, enemy.y, '🛡️ เกราะหนา! ต้องใช้เวท!', '#94a3b8');
+                    } else {
+                        enemy.isDefeated = true;
+                        p.vy = -8.5;
+                        p.mp = Math.min(p.maxMp, p.mp + 15);
+                        store.addScore(50);
+                        this.sfx.playHit();
+                        this.triggerShake(10, 14);
+                        this.hitFreezeTimer = 4;
+                        this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 18);
+                        this.addFloatingText(enemy.x, enemy.y, '+50 (+15 MP)', '#38bdf8');
+                    }
                 } else {
                     this.handlePlayerDamage();
                 }
@@ -1496,6 +1546,7 @@ class PlatformerGame {
                     }
                 });
 
+                // เวทโดนบอส
                 if (this.boss && !this.boss.isDefeated) {
                     const b = this.boss;
                     if (
@@ -1505,20 +1556,25 @@ class PlatformerGame {
                         sp.hit = true;
                         b.hp--;
                         b.hitTimer = 15;
+                        p.mp = Math.min(p.maxMp, p.mp + 20);
+
+                        if (sp.type === 'ice') {
+                            b.isSlowed = true;
+                            b.slowTimer = 180;
+                            this.addFloatingText(b.x, b.y - 20, '❄️ บอสชะลอความเร็ว!', '#38bdf8');
+                        }
+
                         this.sfx.playHit();
                         this.triggerShake(12, 16);
                         this.addParticles(b.x + b.width / 2, b.y + b.height / 2, sp.type === 'fire' ? '#f97316' : '#38bdf8', 20);
 
                         if (b.hp <= 0) {
                             b.isDefeated = true;
-                            store.addScore(300);
-                            this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ได้รับกุญแจ!', '#facc15');
-                            if (this.keyItem) {
-                                this.keyItem.x = b.x + b.width / 2 - 11;
-                                this.keyItem.y = b.y - 10;
-                            }
+                            store.addScore(400);
+                            this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ประตูเปิดแล้ว!', '#facc15');
+                            if (this.goal) this.goal.isLocked = false;
                         } else {
-                            this.addFloatingText(b.x, b.y - 20, `💥 เวทโจมตี! HP: ${b.hp}/${b.maxHp}`, '#ef4444');
+                            this.addFloatingText(b.x, b.y - 20, `💥 ยิงโดนบอส! HP: ${b.hp}/${b.maxHp}`, '#ef4444');
                         }
                     }
                 }
@@ -1543,17 +1599,15 @@ class PlatformerGame {
                     if (b.x + b.width > minX && b.x < maxX) {
                         b.hp--;
                         b.hitTimer = 15;
+                        p.mp = Math.min(p.maxMp, p.mp + 20);
                         this.sfx.playHit();
                         this.triggerShake(14, 18);
                         this.addParticles(b.x + b.width / 2, b.y + b.height / 2, '#facc15', 25);
                         if (b.hp <= 0) {
                             b.isDefeated = true;
-                            store.addScore(300);
-                            this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ได้รับกุญแจ!', '#facc15');
-                            if (this.keyItem) {
-                                this.keyItem.x = b.x + b.width / 2 - 11;
-                                this.keyItem.y = b.y - 10;
-                            }
+                            store.addScore(400);
+                            this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ประตูเปิดแล้ว!', '#facc15');
+                            if (this.goal) this.goal.isLocked = false;
                         } else {
                             this.addFloatingText(b.x, b.y - 20, `⚡ อัสนีฟาด! HP: ${b.hp}/${b.maxHp}`, '#facc15');
                         }
@@ -1589,6 +1643,7 @@ class PlatformerGame {
             const dy = (p.y + p.height / 2) - pj.y;
             const dist = Math.hypot(dx, dy);
 
+            // กด Dash สะท้อนกระสุนบอส
             if (p.isDashing && p.dashTimer > 5 && dist < pj.radius + p.width / 1.8 && !pj.isParried) {
                 pj.isParried = true;
                 pj.vx *= -1.8;
@@ -1607,22 +1662,6 @@ class PlatformerGame {
             }
         });
         this.projectiles = this.projectiles.filter(pj => !pj.hit && pj.x > this.cameraX - 50 && pj.x < this.canvas.width + 50);
-
-        if (this.keyItem && !this.keyItem.collected) {
-            if (
-                p.x < this.keyItem.x + this.keyItem.width &&
-                p.x + p.width > this.keyItem.x &&
-                p.y < this.keyItem.y + this.keyItem.height &&
-                p.y + p.height > this.keyItem.y
-            ) {
-                this.keyItem.collected = true;
-                if (this.goal) this.goal.isLocked = false;
-                store.addScore(30);
-                this.sfx.playCheckpoint();
-                this.addParticles(this.keyItem.x, this.keyItem.y, '#facc15', 15);
-                this.addFloatingText(this.keyItem.x, this.keyItem.y, 'ปลดล็อกประตู!', '#facc15');
-            }
-        }
 
         this.powerups.forEach(pw => {
             if (!pw.collected) {
@@ -1684,6 +1723,7 @@ class PlatformerGame {
             }
         });
 
+        // เส้นชัยผ่านด่าน (เข้าประตูได้ทันทีโดยไม่ต้องใช้กุญแจ)
         if (
             this.goal &&
             !this.goal.isLocked &&
@@ -1900,22 +1940,22 @@ class PlatformerGame {
             this.ctx.globalAlpha = 1.0;
         });
 
-        // Checkpoint Flag
-        if (this.checkpoint) {
-            this.ctx.fillStyle = this.checkpoint.active ? '#22c55e' : '#38bdf8';
+        // Checkpoint Flags (เรนเดอร์ทุกจุดเซฟในด่าน)
+        this.checkpoints.forEach(cp => {
+            this.ctx.fillStyle = cp.active ? '#22c55e' : '#38bdf8';
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 2.5;
-            this.ctx.fillRect(this.checkpoint.x, this.checkpoint.y, 5, this.checkpoint.height);
-            this.ctx.strokeRect(this.checkpoint.x, this.checkpoint.y, 5, this.checkpoint.height);
+            this.ctx.fillRect(cp.x, cp.y, 5, cp.height);
+            this.ctx.strokeRect(cp.x, cp.y, 5, cp.height);
             
             this.ctx.beginPath();
-            this.ctx.moveTo(this.checkpoint.x + 5, this.checkpoint.y);
-            this.ctx.lineTo(this.checkpoint.x + 22, this.checkpoint.y + 8);
-            this.ctx.lineTo(this.checkpoint.x + 5, this.checkpoint.y + 16);
+            this.ctx.moveTo(cp.x + 5, cp.y);
+            this.ctx.lineTo(cp.x + 22, cp.y + 8);
+            this.ctx.lineTo(cp.x + 5, cp.y + 16);
             this.ctx.closePath();
             this.ctx.fill();
             this.ctx.stroke();
-        }
+        });
 
         // Render Lava Wall
         if (this.lava) {
@@ -1938,7 +1978,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // Render Goal Portal
+        // Render Goal Portal (ไม่ต้องใช้กุญแจ)
         if (this.goal) {
             this.ctx.save();
             const isLocked = this.goal.isLocked;
@@ -1957,9 +1997,9 @@ class PlatformerGame {
                 this.ctx.fillText('GOAL', this.goal.x + this.goal.width / 2, this.goal.y + 26);
             } else {
                 this.ctx.fillStyle = '#ef4444';
-                this.ctx.font = 'bold 16px sans-serif';
+                this.ctx.font = 'bold 14px sans-serif';
                 this.ctx.textAlign = 'center';
-                this.ctx.fillText('🔒', this.goal.x + this.goal.width / 2, this.goal.y + 28);
+                this.ctx.fillText('⚔️ BOSS', this.goal.x + this.goal.width / 2, this.goal.y + 26);
             }
 
             this.ctx.restore();
@@ -2003,6 +2043,20 @@ class PlatformerGame {
             this.ctx.fillStyle = topColor;
             this.ctx.fillRect(plat.x + 2, plat.y + 2, plat.width - 4, 8);
 
+            this.ctx.restore();
+        });
+
+        // Render Springs
+        this.springs.forEach(spg => {
+            this.ctx.save();
+            this.ctx.fillStyle = '#38bdf8';
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 2.5;
+            this.ctx.fillRect(spg.x, spg.y, spg.width, spg.height);
+            this.ctx.strokeRect(spg.x, spg.y, spg.width, spg.height);
+
+            this.ctx.fillStyle = '#facc15';
+            this.ctx.fillRect(spg.x + 2, spg.y + 2, spg.width - 4, 3);
             this.ctx.restore();
         });
 
@@ -2099,18 +2153,19 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // Render Boss
+        // Render Boss (วิ่งนำหน้า หันหลังมายิงสวน)
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             this.ctx.save();
 
-            this.ctx.fillStyle = b.hitTimer > 0 ? '#ffffff' : '#dc2626';
+            this.ctx.fillStyle = b.hitTimer > 0 ? '#ffffff' : (b.isSlowed ? '#38bdf8' : '#dc2626');
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 3.5;
 
             this.ctx.fillRect(b.x, b.y, b.width, b.height);
             this.ctx.strokeRect(b.x, b.y, b.width, b.height);
 
+            // เขาบอส
             this.ctx.fillStyle = '#991b1b';
             this.ctx.beginPath();
             this.ctx.moveTo(b.x + 8, b.y);
@@ -2126,60 +2181,26 @@ class PlatformerGame {
             this.ctx.fill();
             this.ctx.stroke();
 
+            // ตาบอส (หันกลับมามองผู้เล่นข้างหลัง)
             this.ctx.fillStyle = '#facc15';
-            this.ctx.beginPath();
-            this.ctx.moveTo(b.x + 10, b.y + 15);
-            this.ctx.lineTo(b.x + 24, b.y + 20);
-            this.ctx.lineTo(b.x + 10, b.y + 25);
-            this.ctx.closePath();
-            this.ctx.fill();
-            this.ctx.stroke();
-
-            this.ctx.beginPath();
-            this.ctx.moveTo(b.x + b.width - 10, b.y + 15);
-            this.ctx.lineTo(b.x + b.width - 24, b.y + 20);
-            this.ctx.lineTo(b.x + b.width - 10, b.y + 25);
-            this.ctx.closePath();
-            this.ctx.fill();
-            this.ctx.stroke();
-
+            this.ctx.fillRect(b.x + 8, b.y + 15, 12, 10);
             this.ctx.fillStyle = '#000000';
-            this.ctx.fillRect(b.x + 15, b.y + 18, 4, 5);
-            this.ctx.fillRect(b.x + b.width - 19, b.y + 18, 4, 5);
+            this.ctx.fillRect(b.x + 9, b.y + 17, 5, 6);
 
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 3;
-            this.ctx.beginPath();
-            this.ctx.moveTo(b.x + 8, b.y + 12);
-            this.ctx.lineTo(b.x + 26, b.y + 18);
-            this.ctx.moveTo(b.x + b.width - 8, b.y + 12);
-            this.ctx.lineTo(b.x + b.width - 26, b.y + 18);
-            this.ctx.stroke();
-
-            this.ctx.fillStyle = '#450a0a';
-            this.ctx.fillRect(b.x + 12, b.y + 32, b.width - 24, 12);
-            this.ctx.strokeRect(b.x + 12, b.y + 32, b.width - 24, 12);
-
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.beginPath();
-            this.ctx.moveTo(b.x + 15, b.y + 32);
-            this.ctx.lineTo(b.x + 19, b.y + 38);
-            this.ctx.lineTo(b.x + 23, b.y + 32);
-            
-            this.ctx.moveTo(b.x + b.width - 15, b.y + 32);
-            this.ctx.lineTo(b.x + b.width - 19, b.y + 38);
-            this.ctx.lineTo(b.x + b.width - 23, b.y + 32);
-            this.ctx.fill();
-
+            // หลอดเลือดบอส
             const hpWidth = b.width;
             const currentHpW = (b.hp / b.maxHp) * hpWidth;
             this.ctx.fillStyle = '#000000';
-            this.ctx.fillRect(b.x, b.y - 22, hpWidth, 8);
+            this.ctx.fillRect(b.x, b.y - 20, hpWidth, 8);
             this.ctx.fillStyle = '#ef4444';
-            this.ctx.fillRect(b.x, b.y - 22, currentHpW, 8);
+            this.ctx.fillRect(b.x, b.y - 20, currentHpW, 8);
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 1.5;
-            this.ctx.strokeRect(b.x, b.y - 22, hpWidth, 8);
+            this.ctx.strokeRect(b.x, b.y - 20, hpWidth, 8);
+
+            this.ctx.font = 'bold 10px sans-serif';
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillText(`BOSS ${b.hp}/${b.maxHp}`, b.x, b.y - 24);
 
             this.ctx.restore();
         }
@@ -2196,31 +2217,39 @@ class PlatformerGame {
             const feetY = e.y + e.height;
             this.ctx.translate(feetX, feetY);
 
-            if (e.vx > 0) {
-                this.ctx.scale(-1, 1);
-            }
-
             if (this.enemyImg && this.enemyImg.complete) {
                 this.ctx.drawImage(this.enemyImg, -renderW / 2, -renderH, renderW, renderH);
             } else {
-                this.ctx.fillStyle = '#9ca3af';
+                this.ctx.fillStyle = e.isArmored ? '#64748b' : '#9ca3af';
                 this.ctx.strokeStyle = '#000000';
                 this.ctx.lineWidth = 3;
                 this.ctx.fillRect(-renderW / 2, -renderH, renderW, renderH);
                 this.ctx.strokeRect(-renderW / 2, -renderH, renderW, renderH);
             }
 
-            // Render Frozen Overlay
+            // สัญลักษณ์ศัตรูบิน (ปีก)
+            if (e.isFlying) {
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.beginPath();
+                this.ctx.ellipse(-renderW / 2 - 4, -renderH / 2, 8, 14, Math.PI / 4, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.stroke();
+            }
+
+            // สัญลักษณ์เกราะหนา
+            if (e.isArmored) {
+                this.ctx.strokeStyle = '#facc15';
+                this.ctx.lineWidth = 2.5;
+                this.ctx.strokeRect(-renderW / 2 - 2, -renderH - 2, renderW + 4, renderH + 4);
+            }
+
+            // เอฟเฟกต์แช่แข็ง
             if (e.isFrozen) {
                 this.ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
                 this.ctx.strokeStyle = '#38bdf8';
                 this.ctx.lineWidth = 3;
                 this.ctx.fillRect(-renderW / 2 - 4, -renderH - 4, renderW + 8, renderH + 8);
                 this.ctx.strokeRect(-renderW / 2 - 4, -renderH - 4, renderW + 8, renderH + 8);
-
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.fillRect(-renderW / 4, -renderH * 0.75, 5, 5);
-                this.ctx.fillRect(renderW / 4 - 5, -renderH * 0.35, 6, 6);
             }
 
             this.ctx.restore();
@@ -2294,27 +2323,6 @@ class PlatformerGame {
             this.ctx.stroke();
             this.ctx.restore();
         });
-
-        // Render Key Item
-        if (this.keyItem && !this.keyItem.collected && this.keyItem.x > -100) {
-            this.ctx.save();
-            const keyY = this.keyItem.y + Math.sin(this.levelTime * 0.08) * 4;
-            this.ctx.translate(this.keyItem.x + 10, keyY + 10);
-
-            this.ctx.strokeStyle = '#facc15';
-            this.ctx.lineWidth = 3.5;
-            this.ctx.beginPath();
-            this.ctx.arc(-4, -4, 6, 0, Math.PI * 2);
-            this.ctx.stroke();
-
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, 0);
-            this.ctx.lineTo(10, 10);
-            this.ctx.lineTo(8, 12);
-            this.ctx.stroke();
-
-            this.ctx.restore();
-        }
 
         // Render Power-up Items
         this.powerups.forEach(pw => {
@@ -2424,6 +2432,15 @@ class PlatformerGame {
         this.ctx.font = 'bold 11px sans-serif';
         this.ctx.fillStyle = '#ffffff';
         this.ctx.fillText(`MP: ${Math.floor(p.mp)}/${p.maxMp} [${spellIcons[activeSpell]}]`, barX + barW + 8, barY + 9);
+
+        // หลอดบอกความคืบหน้าของด่าน (Progress Bar)
+        const progW = this.canvas.width - 24;
+        const progY = this.canvas.height - 14;
+        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+        this.ctx.fillRect(12, progY, progW, 6);
+        const progress = Math.min(1, p.x / (this.levelWidth - 100));
+        this.ctx.fillStyle = '#facc15';
+        this.ctx.fillRect(12, progY, progW * progress, 6);
 
         if (this.comboCount > 1) {
             const currentMult = Math.min(5, 1 + Math.floor(this.comboCount / 3));
