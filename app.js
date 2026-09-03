@@ -107,6 +107,52 @@ class SoundFX {
         osc.start();
         osc.stop(this.ctx.currentTime + 0.3);
     }
+
+    playMagicFire() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(720, this.ctx.currentTime + 0.18);
+        gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.18);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.18);
+    }
+
+    playMagicIce() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(1320, this.ctx.currentTime + 0.08);
+        osc.frequency.setValueAtTime(1760, this.ctx.currentTime + 0.16);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.25);
+    }
+
+    playMagicThunder() {
+        if (!this.ctx || !store.getState().soundEnabled) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(130, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(35, this.ctx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.35);
+    }
 }
 
 class PlatformerGame {
@@ -123,7 +169,7 @@ class PlatformerGame {
         this.enemyImg.src = 'enemy.png';
 
         // Controls
-        this.keys = { left: false, right: false, up: false, down: false, jump: false, dash: false };
+        this.keys = { jump: false, dash: false, magic: false };
         this.animationFrameId = null;
 
         // BGM
@@ -144,6 +190,7 @@ class PlatformerGame {
         this.enemies = [];
         this.boss = null;
         this.projectiles = [];
+        this.spells = [];
         this.checkpoint = null;
         this.spawnPoint = { x: 50, y: 0 };
         this.lava = null;
@@ -444,7 +491,9 @@ class PlatformerGame {
                     maxX: currX + platWidth - 32,
                     isDefeated: false,
                     isRanged: isRanged,
-                    shootTimer: 0
+                    shootTimer: 0,
+                    isFrozen: false,
+                    freezeTimer: 0
                 });
             }
 
@@ -545,6 +594,7 @@ class PlatformerGame {
         this.weatherParticles = [];
         this.floatingTexts = [];
         this.projectiles = [];
+        this.spells = [];
         this.comboCount = 0;
         this.comboTimer = 0;
 
@@ -584,12 +634,20 @@ class PlatformerGame {
             height: 42,
             vx: 0,
             vy: 0,
-            speed: 4.0,
+            speed: 4.2, // ปรับความเร็ววิ่งอัตโนมัติให้ต่อเนื่องและคล่องตัว
             jumpPower: -6.8,
             isGrounded: false,
             
             lives: 3,
             maxLives: 3,
+
+            // Magic System
+            mp: 100,
+            maxMp: 100,
+            mpRegen: 0.35,
+            spellList: ['fire', 'ice', 'thunder'],
+            currentSpellIndex: 0,
+            magicCooldown: 0,
 
             jumpsLeft: 2,
             isDashing: false,
@@ -612,7 +670,7 @@ class PlatformerGame {
 
             trail: [],
 
-            facing: 'right',
+            facing: 'right', // ตัวละครวิ่งไปข้างหน้าเสมอ
             walkTimer: 0,
             idleTimer: 0,
             rotation: 0,
@@ -659,18 +717,16 @@ class PlatformerGame {
     }
 
     setupTouchControls() {
-        const bindBtn = (id, key, onPress) => {
+        const bindBtn = (id, onPress) => {
             const btn = document.getElementById(id);
             if (!btn) return;
             const start = (e) => {
                 e.preventDefault();
-                this.keys[key] = true;
                 btn.classList.add('pressed');
                 if (onPress) onPress();
             };
             const end = (e) => {
                 e.preventDefault();
-                this.keys[key] = false;
                 btn.classList.remove('pressed');
             };
 
@@ -681,34 +737,29 @@ class PlatformerGame {
             btn.addEventListener('mouseleave', end);
         };
 
-        bindBtn('btn-left', 'left');
-        bindBtn('btn-right', 'right');
-        bindBtn('btn-jump', 'jump', () => this.handleJumpTrigger());
-        bindBtn('btn-dash', 'dash', () => this.handleDashTrigger());
+        bindBtn('btn-jump', () => this.handleJumpTrigger());
+        bindBtn('btn-dash', () => this.handleDashTrigger());
+        bindBtn('btn-magic', () => this.handleMagicTrigger());
+        bindBtn('btn-slam', () => this.handleGroundPoundTrigger());
+        bindBtn('btn-spell-switch', () => this.handleSwitchSpellTrigger());
     }
 
     setupKeyboardControls() {
         window.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft' || e.key === 'a') this.keys.left = true;
-            if (e.key === 'ArrowRight' || e.key === 'd') this.keys.right = true;
-            if (e.key === 'ArrowUp' || e.key === 'w') this.keys.up = true;
-            if (e.key === 'ArrowDown' || e.key === 's') {
-                this.keys.down = true;
-                this.handleGroundPoundTrigger();
-            }
-            if (e.key === ' ') {
+            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') {
                 if (!this.keys.jump) this.handleJumpTrigger();
                 this.keys.jump = true;
             }
+            if (e.key === 'ArrowDown' || e.key === 's') {
+                this.handleGroundPoundTrigger();
+            }
             if (e.key === 'Shift' || e.key === 'k') this.handleDashTrigger();
+            if (e.key === 'j' || e.key === 'x' || e.key === 'f') this.handleMagicTrigger();
+            if (e.key === 'q' || e.key === 'e' || e.key === 'c') this.handleSwitchSpellTrigger();
         });
 
         window.addEventListener('keyup', (e) => {
-            if (e.key === 'ArrowLeft' || e.key === 'a') this.keys.left = false;
-            if (e.key === 'ArrowRight' || e.key === 'd') this.keys.right = false;
-            if (e.key === 'ArrowUp' || e.key === 'w') this.keys.up = false;
-            if (e.key === 'ArrowDown' || e.key === 's') this.keys.down = false;
-            if (e.key === ' ') this.keys.jump = false;
+            if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') this.keys.jump = false;
         });
     }
 
@@ -758,21 +809,8 @@ class PlatformerGame {
         if (this.isGameCleared) return;
         const p = this.player;
         if (p.dashCooldown <= 0 && !p.isDashing) {
-            let dx = 0;
-            let dy = 0;
-
-            if (this.keys.left) dx -= 1;
-            if (this.keys.right) dx += 1;
-            if (this.keys.up) dy -= 1;
-            if (this.keys.down) dy += 1;
-
-            if (dx === 0 && dy === 0) {
-                dx = p.facing === 'right' ? 1 : -1;
-            }
-
-            const len = Math.hypot(dx, dy);
-            p.dashDirX = dx / len;
-            p.dashDirY = dy / len;
+            p.dashDirX = 1;
+            p.dashDirY = 0;
 
             p.isDashing = true;
             p.isGroundPounding = false;
@@ -785,14 +823,90 @@ class PlatformerGame {
         }
     }
 
+    handleSwitchSpellTrigger() {
+        const p = this.player;
+        if (!p) return;
+        p.currentSpellIndex = (p.currentSpellIndex + 1) % p.spellList.length;
+        const current = p.spellList[p.currentSpellIndex];
+        const spellNames = {
+            fire: '🔥 ลูกไฟเพลิง (Fireball)',
+            ice: '❄️ ลิ่มเยือกแข็ง (Frost Spike)',
+            thunder: '⚡ อัสนีบาต (Thunder Strike)'
+        };
+        const spellColors = {
+            fire: '#f97316',
+            ice: '#38bdf8',
+            thunder: '#facc15'
+        };
+        this.addFloatingText(p.x, p.y - 25, spellNames[current], spellColors[current]);
+        this.sfx.playCoin();
+    }
+
+    handleMagicTrigger() {
+        if (this.isGameCleared) return;
+        const p = this.player;
+        if (!p || p.magicCooldown > 0) return;
+
+        const spellType = p.spellList[p.currentSpellIndex];
+        const costs = { fire: 20, ice: 25, thunder: 35 };
+        const cost = costs[spellType] || 20;
+
+        if (p.mp < cost) {
+            this.addFloatingText(p.x, p.y - 20, '⚠️ MP ไม่พอ!', '#ef4444');
+            this.sfx.playHit();
+            return;
+        }
+
+        p.mp -= cost;
+        p.magicCooldown = 16;
+        const dir = 1; // ยิงไปด้านหน้าของทิศทางวิ่งเสมอ
+
+        if (spellType === 'fire') {
+            this.sfx.playMagicFire();
+            this.spells.push({
+                type: 'fire',
+                x: p.x + p.width + 5,
+                y: p.y + p.height * 0.4,
+                vx: dir * 8.5,
+                vy: 0,
+                radius: 12,
+                life: 75
+            });
+            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#f97316', 10);
+        } else if (spellType === 'ice') {
+            this.sfx.playMagicIce();
+            this.spells.push({
+                type: 'ice',
+                x: p.x + p.width + 5,
+                y: p.y + p.height * 0.4,
+                vx: dir * 7.5,
+                vy: 0,
+                radius: 10,
+                life: 75
+            });
+            this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 10);
+        } else if (spellType === 'thunder') {
+            this.sfx.playMagicThunder();
+            const strikeX = p.x + 140;
+            this.spells.push({
+                type: 'thunder',
+                x: strikeX,
+                y: 0,
+                width: 44,
+                height: this.canvas.height,
+                life: 14,
+                hasHit: false
+            });
+            this.triggerShake(9, 12);
+            this.addParticles(strikeX, p.y + p.height / 2, '#facc15', 20);
+        }
+    }
+
     handleTabChange(tab) {
         if (tab !== 'game') {
-            this.keys.left = false;
-            this.keys.right = false;
-            this.keys.up = false;
-            this.keys.down = false;
             this.keys.jump = false;
             this.keys.dash = false;
+            this.keys.magic = false;
         }
         this.updateBGMState();
     }
@@ -846,6 +960,10 @@ class PlatformerGame {
 
         const p = this.player;
         this.levelTime++;
+
+        // Regenerate MP naturally
+        p.mp = Math.min(p.maxMp, p.mp + p.mpRegen);
+        if (p.magicCooldown > 0) p.magicCooldown--;
 
         const targetCamX = Math.max(0, p.x - this.canvas.width * 0.3);
         this.cameraX += (targetCamX - this.cameraX) * 0.1;
@@ -936,6 +1054,7 @@ class PlatformerGame {
 
         const currentSpeed = p.boostTimer > 0 ? p.speed * 1.5 : p.speed;
 
+        // Auto-Runner Forward Movement
         if (p.isGroundPounding) {
             p.vx = 0;
             p.vy = 14.0;
@@ -945,15 +1064,8 @@ class PlatformerGame {
             p.dashTimer--;
             if (p.dashTimer <= 0) p.isDashing = false;
         } else {
-            if (this.keys.left) {
-                p.vx = -currentSpeed;
-                p.facing = 'left';
-            } else if (this.keys.right) {
-                p.vx = currentSpeed;
-                p.facing = 'right';
-            } else {
-                p.vx = 0;
-            }
+            p.vx = currentSpeed; // วิ่งไปข้างหน้าอัตโนมัติตลอดเวลา
+            p.facing = 'right';
             p.vy += this.GRAVITY;
         }
 
@@ -1021,11 +1133,8 @@ class PlatformerGame {
                 p.y + p.height > crate.y
             ) {
                 if (p.vx > 0 && p.x + p.width - p.vx <= crate.x) {
-                    crate.vx = 2.2;
+                    crate.vx = 2.4;
                     p.x = crate.x - p.width;
-                } else if (p.vx < 0 && p.x - p.vx >= crate.x + crate.width) {
-                    crate.vx = -2.2;
-                    p.x = crate.x + crate.width;
                 } else if (p.vy > 0 && p.y + p.height - p.vy <= crate.y) {
                     p.isGrounded = true;
                     p.jumpsLeft = 2;
@@ -1035,7 +1144,7 @@ class PlatformerGame {
             }
         });
 
-        // Update Vines (เถาวัลย์เผาได้ด้วย Dash/Ground Pound)
+        // Update Vines (เถาวัลย์เผาได้ด้วย Dash / Ground Pound หรือเวทเพลิง)
         this.vines.forEach(vine => {
             if (vine.isBurned) return;
 
@@ -1053,7 +1162,6 @@ class PlatformerGame {
                     this.addFloatingText(vine.x, vine.y - 10, '🔥 เผาเถาวัลย์!', '#f97316');
                 } else {
                     if (p.vx > 0) p.x = vine.x - p.width;
-                    else if (p.vx < 0) p.x = vine.x + vine.width;
                 }
             }
         });
@@ -1156,6 +1264,7 @@ class PlatformerGame {
                         if (!enemy.isDefeated && Math.abs((enemy.x + enemy.width / 2) - (p.x + p.width / 2)) < 110) {
                             enemy.isDefeated = true;
                             store.addScore(75);
+                            p.mp = Math.min(p.maxMp, p.mp + 20);
                             this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 15);
                         }
                     });
@@ -1179,12 +1288,6 @@ class PlatformerGame {
                 if (plat.type === 'crumble') {
                     plat.isCrumbling = true;
                     this.addParticles(plat.x + plat.width / 2, plat.y, '#d97706', 2);
-                }
-
-                if (plat.type === 'ice') {
-                    if (!this.keys.left && !this.keys.right) {
-                        p.vx *= 0.96;
-                    }
                 }
 
                 if (plat.type === 'conveyor_left') p.x -= 1.8;
@@ -1235,6 +1338,7 @@ class PlatformerGame {
                     b.hp--;
                     b.hitTimer = 15;
                     p.vy = -9.5;
+                    p.mp = Math.min(p.maxMp, p.mp + 25);
                     this.sfx.playHit();
                     this.triggerShake(12, 16);
                     this.hitFreezeTimer = 6;
@@ -1257,8 +1361,32 @@ class PlatformerGame {
             }
         }
 
+        // Enemies Update
         this.enemies.forEach(enemy => {
             if (enemy.isDefeated) return;
+
+            // Handle Frozen State (Platform Effect)
+            if (enemy.isFrozen) {
+                enemy.freezeTimer--;
+                if (enemy.freezeTimer <= 0) {
+                    enemy.isFrozen = false;
+                    this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#38bdf8', 12);
+                }
+
+                if (
+                    p.x < enemy.x + enemy.width &&
+                    p.x + p.width > enemy.x &&
+                    p.y + p.height >= enemy.y &&
+                    p.y + p.height <= enemy.y + enemy.height + p.vy &&
+                    p.vy >= 0
+                ) {
+                    p.isGrounded = true;
+                    p.jumpsLeft = 2;
+                    p.vy = 0;
+                    p.y = enemy.y - p.height;
+                }
+                return;
+            }
 
             if (!enemy.isRanged) {
                 enemy.x += enemy.vx;
@@ -1292,18 +1420,167 @@ class PlatformerGame {
                 if (p.vy > 0 && (p.y + p.height - p.vy) <= enemy.y + 12) {
                     enemy.isDefeated = true;
                     p.vy = -8.5;
+                    p.mp = Math.min(p.maxMp, p.mp + 15);
                     store.addScore(50);
                     this.sfx.playHit();
                     this.triggerShake(10, 14);
                     this.hitFreezeTimer = 4;
                     this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 18);
-                    this.addFloatingText(enemy.x, enemy.y, '+50', '#a855f7');
+                    this.addFloatingText(enemy.x, enemy.y, '+50 (+15 MP)', '#38bdf8');
                 } else {
                     this.handlePlayerDamage();
                 }
             }
         });
 
+        // Magic Spells Logic
+        this.spells.forEach(sp => {
+            sp.life--;
+
+            if (sp.type === 'fire' || sp.type === 'ice') {
+                sp.x += sp.vx;
+
+                if (Math.random() > 0.4) {
+                    this.particles.push({
+                        x: sp.x,
+                        y: sp.y,
+                        vx: -sp.vx * 0.2 + (Math.random() - 0.5) * 1.5,
+                        vy: (Math.random() - 0.5) * 1.5,
+                        size: Math.random() * 3 + 2,
+                        color: sp.type === 'fire' ? '#f97316' : '#38bdf8',
+                        alpha: 0.8,
+                        life: 12
+                    });
+                }
+
+                if (sp.type === 'fire') {
+                    this.vines.forEach(vine => {
+                        if (
+                            !vine.isBurned &&
+                            sp.x > vine.x && sp.x < vine.x + vine.width &&
+                            sp.y > vine.y && sp.y < vine.y + vine.height
+                        ) {
+                            vine.isBurned = true;
+                            sp.hit = true;
+                            this.sfx.playBurn();
+                            this.triggerShake(8, 10);
+                            this.addParticles(vine.x + vine.width / 2, vine.y + vine.height / 2, '#ef4444', 25);
+                            this.addFloatingText(vine.x, vine.y - 10, '🔥 เพลิงเผาเถาวัลย์!', '#f97316');
+                        }
+                    });
+                }
+
+                this.enemies.forEach(enemy => {
+                    if (enemy.isDefeated) return;
+                    if (
+                        sp.x > enemy.x && sp.x < enemy.x + enemy.width &&
+                        sp.y > enemy.y && sp.y < enemy.y + enemy.height
+                    ) {
+                        sp.hit = true;
+                        if (sp.type === 'fire') {
+                            enemy.isDefeated = true;
+                            store.addScore(60);
+                            p.mp = Math.min(p.maxMp, p.mp + 15);
+                            this.sfx.playHit();
+                            this.triggerShake(7, 10);
+                            this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#f97316', 20);
+                            this.addFloatingText(enemy.x, enemy.y, '🔥 FIRE HIT! +60', '#f97316');
+                        } else if (sp.type === 'ice') {
+                            enemy.isFrozen = true;
+                            enemy.freezeTimer = 240;
+                            this.sfx.playMagicIce();
+                            this.triggerShake(6, 8);
+                            this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#38bdf8', 20);
+                            this.addFloatingText(enemy.x, enemy.y - 15, '❄️ แช่แข็ง! (เหยียบได้)', '#38bdf8');
+                        }
+                    }
+                });
+
+                if (this.boss && !this.boss.isDefeated) {
+                    const b = this.boss;
+                    if (
+                        sp.x > b.x && sp.x < b.x + b.width &&
+                        sp.y > b.y && sp.y < b.y + b.height
+                    ) {
+                        sp.hit = true;
+                        b.hp--;
+                        b.hitTimer = 15;
+                        this.sfx.playHit();
+                        this.triggerShake(12, 16);
+                        this.addParticles(b.x + b.width / 2, b.y + b.height / 2, sp.type === 'fire' ? '#f97316' : '#38bdf8', 20);
+
+                        if (b.hp <= 0) {
+                            b.isDefeated = true;
+                            store.addScore(300);
+                            this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ได้รับกุญแจ!', '#facc15');
+                            if (this.keyItem) {
+                                this.keyItem.x = b.x + b.width / 2 - 11;
+                                this.keyItem.y = b.y - 10;
+                            }
+                        } else {
+                            this.addFloatingText(b.x, b.y - 20, `💥 เวทโจมตี! HP: ${b.hp}/${b.maxHp}`, '#ef4444');
+                        }
+                    }
+                }
+            } else if (sp.type === 'thunder' && !sp.hasHit) {
+                sp.hasHit = true;
+                const minX = sp.x - sp.width / 2;
+                const maxX = sp.x + sp.width / 2;
+
+                this.enemies.forEach(enemy => {
+                    if (!enemy.isDefeated && enemy.x + enemy.width > minX && enemy.x < maxX) {
+                        enemy.isDefeated = true;
+                        store.addScore(70);
+                        p.mp = Math.min(p.maxMp, p.mp + 15);
+                        this.sfx.playHit();
+                        this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#facc15', 22);
+                        this.addFloatingText(enemy.x, enemy.y, '⚡ THUNDER! +70', '#facc15');
+                    }
+                });
+
+                if (this.boss && !this.boss.isDefeated) {
+                    const b = this.boss;
+                    if (b.x + b.width > minX && b.x < maxX) {
+                        b.hp--;
+                        b.hitTimer = 15;
+                        this.sfx.playHit();
+                        this.triggerShake(14, 18);
+                        this.addParticles(b.x + b.width / 2, b.y + b.height / 2, '#facc15', 25);
+                        if (b.hp <= 0) {
+                            b.isDefeated = true;
+                            store.addScore(300);
+                            this.addFloatingText(b.x, b.y - 20, '🏆 บอสพ่ายแพ้! ได้รับกุญแจ!', '#facc15');
+                            if (this.keyItem) {
+                                this.keyItem.x = b.x + b.width / 2 - 11;
+                                this.keyItem.y = b.y - 10;
+                            }
+                        } else {
+                            this.addFloatingText(b.x, b.y - 20, `⚡ อัสนีฟาด! HP: ${b.hp}/${b.maxHp}`, '#facc15');
+                        }
+                    }
+                }
+
+                this.crates.forEach(crate => {
+                    if (crate.x + crate.width > minX && crate.x < maxX) {
+                        crate.vx = 6;
+                        crate.vy = -4;
+                        this.addParticles(crate.x + crate.width / 2, crate.y, '#facc15', 12);
+                    }
+                });
+
+                this.switches.forEach(sw => {
+                    if (sw.x + sw.width > minX && sw.x < maxX) {
+                        sw.isPressed = true;
+                        this.sfx.playCheckpoint();
+                        this.addParticles(sw.x + sw.width / 2, sw.y, '#facc15', 14);
+                        this.addFloatingText(sw.x, sw.y - 15, '⚡ สวิตช์ถูกกระตุ้น!', '#facc15');
+                    }
+                });
+            }
+        });
+        this.spells = this.spells.filter(sp => !sp.hit && sp.life > 0);
+
+        // Projectiles Update
         this.projectiles.forEach(pj => {
             pj.x += pj.vx;
             pj.y += pj.vy;
@@ -1380,6 +1657,7 @@ class PlatformerGame {
                     coin.collected = true;
                     this.comboCount++;
                     this.comboTimer = 180;
+                    p.mp = Math.min(p.maxMp, p.mp + 5);
 
                     const multiplier = Math.min(5, 1 + Math.floor(this.comboCount / 3));
                     const basePoints = 10;
@@ -1560,11 +1838,9 @@ class PlatformerGame {
             this.ctx.scale(-1, 1);
         }
 
-        // เรนเดอร์ตัวละครโดยขยายขนาดเฉพาะการวาดภาพ (Visual Only ~1.65 เท่า) โดยวางส้นเท้าของภาพให้ตรงกับเท้าจริง
         if (this.playerImg && this.playerImg.complete) {
             this.ctx.drawImage(this.playerImg, -w * 1.05, -h * 1.9, w * 2.1, h * 1.9);
         } else {
-            // สำรองหากภาพยังไม่โหลด
             this.ctx.fillStyle = '#f97316';
             this.ctx.fillRect(-w / 2, -h, w, h);
         }
@@ -1934,6 +2210,75 @@ class PlatformerGame {
                 this.ctx.strokeRect(-renderW / 2, -renderH, renderW, renderH);
             }
 
+            // Render Frozen Overlay
+            if (e.isFrozen) {
+                this.ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+                this.ctx.strokeStyle = '#38bdf8';
+                this.ctx.lineWidth = 3;
+                this.ctx.fillRect(-renderW / 2 - 4, -renderH - 4, renderW + 8, renderH + 8);
+                this.ctx.strokeRect(-renderW / 2 - 4, -renderH - 4, renderW + 8, renderH + 8);
+
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(-renderW / 4, -renderH * 0.75, 5, 5);
+                this.ctx.fillRect(renderW / 4 - 5, -renderH * 0.35, 6, 6);
+            }
+
+            this.ctx.restore();
+        });
+
+        // Render Magic Spells
+        this.spells.forEach(sp => {
+            this.ctx.save();
+            if (sp.type === 'fire') {
+                this.ctx.beginPath();
+                this.ctx.arc(sp.x, sp.y, sp.radius, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#f97316';
+                this.ctx.strokeStyle = '#facc15';
+                this.ctx.lineWidth = 3;
+                this.ctx.fill();
+                this.ctx.stroke();
+
+                this.ctx.beginPath();
+                this.ctx.arc(sp.x - sp.vx * 0.4, sp.y, sp.radius * 0.5, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fill();
+            } else if (sp.type === 'ice') {
+                this.ctx.translate(sp.x, sp.y);
+                this.ctx.rotate(this.levelTime * 0.2);
+                this.ctx.fillStyle = '#38bdf8';
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2.5;
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, -sp.radius * 1.3);
+                this.ctx.lineTo(sp.radius * 0.8, 0);
+                this.ctx.lineTo(0, sp.radius * 1.3);
+                this.ctx.lineTo(-sp.radius * 0.8, 0);
+                this.ctx.closePath();
+                this.ctx.fill();
+                this.ctx.stroke();
+            } else if (sp.type === 'thunder') {
+                const alpha = Math.max(0, sp.life / 14);
+                this.ctx.globalAlpha = alpha;
+
+                this.ctx.strokeStyle = '#facc15';
+                this.ctx.lineWidth = 6;
+                this.ctx.beginPath();
+                this.ctx.moveTo(sp.x, 0);
+                
+                for (let y = 0; y < sp.height; y += 20) {
+                    const offset = (Math.random() - 0.5) * 25;
+                    this.ctx.lineTo(sp.x + offset, y);
+                }
+                this.ctx.lineTo(sp.x, sp.height);
+                this.ctx.stroke();
+
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 2.5;
+                this.ctx.stroke();
+
+                this.ctx.globalAlpha = 1.0;
+            }
             this.ctx.restore();
         });
 
@@ -2059,11 +2404,32 @@ class PlatformerGame {
         this.ctx.fillStyle = elapsed > this.targetTime ? '#ef4444' : '#ffffff';
         this.ctx.fillText(`⏱️ เวลา: ${elapsed}s / ${this.targetTime}s`, 12, 42);
 
+        // Mana Bar (MP Bar)
+        const barW = 100;
+        const barH = 10;
+        const barX = 12;
+        const barY = 56;
+        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillRect(barX, barY, barW, barH);
+        this.ctx.strokeStyle = '#000000';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(barX, barY, barW, barH);
+
+        const mpPercent = Math.max(0, Math.min(1, p.mp / p.maxMp));
+        this.ctx.fillStyle = '#38bdf8';
+        this.ctx.fillRect(barX + 1, barY + 1, (barW - 2) * mpPercent, barH - 2);
+
+        const spellIcons = { fire: '🔥 เพลิง', ice: '❄️ น้ำแข็ง', thunder: '⚡ สายฟ้า' };
+        const activeSpell = p.spellList[p.currentSpellIndex];
+        this.ctx.font = 'bold 11px sans-serif';
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillText(`MP: ${Math.floor(p.mp)}/${p.maxMp} [${spellIcons[activeSpell]}]`, barX + barW + 8, barY + 9);
+
         if (this.comboCount > 1) {
             const currentMult = Math.min(5, 1 + Math.floor(this.comboCount / 3));
             this.ctx.fillStyle = '#f59e0b';
             this.ctx.font = 'bold 14px sans-serif';
-            this.ctx.fillText(`🔥 COMBO x${currentMult} (${this.comboCount})`, 12, 65);
+            this.ctx.fillText(`🔥 COMBO x${currentMult} (${this.comboCount})`, 12, 84);
         }
 
         if (this.isLavaNear) {

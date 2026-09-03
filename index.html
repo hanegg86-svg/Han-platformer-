@@ -9,8 +9,8 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <title>Platformer Pro - Fire Star Edition</title>
-    <link rel="stylesheet" href="styles.css?v=12">
+    <title>Platformer Pro - Auto-Run Magic Action</title>
+    <link rel="stylesheet" href="styles.css?v=14">
     
     <!-- App Icon Config -->
     <meta name="theme-color" content="#0f172a">
@@ -47,13 +47,14 @@
                     </div>
                 </div>
 
-                <!-- Touch Controller Overlay -->
+                <!-- Touch Controller Overlay (Auto-Run Layout) -->
                 <div class="touch-controls">
-                    <div class="dpad">
-                        <button id="btn-left" class="touch-btn">◀</button>
-                        <button id="btn-right" class="touch-btn">▶</button>
+                    <div class="left-controls">
+                        <button id="btn-spell-switch" class="touch-btn btn-spell-switch" title="สลับเวทมนตร์">🔄</button>
+                        <button id="btn-slam" class="touch-btn btn-slam" title="ทุบพื้น">⬇️ ทุบ</button>
                     </div>
                     <div class="action-btns">
+                        <button id="btn-magic" class="touch-btn btn-magic">✨ เวท</button>
                         <button id="btn-dash" class="touch-btn btn-dash">⚡ พุ่ง</button>
                         <button id="btn-jump" class="touch-btn btn-action">กระโดด</button>
                     </div>
@@ -133,6 +134,6 @@
         </nav>
     </div>
 
-    <script type="module" src="app.js?v=12"></script>
+    <script type="module" src="app.js?v=14"></script>
 </body>
 </html>
