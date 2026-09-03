@@ -156,9 +156,11 @@ class PlatformerGame {
         this.keys = { jump: false, dash: false, fire: false };
         this.animationFrameId = null;
 
-        // BGM
-        this.bgm = new Audio('bgm.mp3');
-        this.bgm.loop = true;
+        // BGM Playlist
+        this.bgmTracks = ['bgm.mp3', 'bgm2.mp3'];
+        this.currentBgmIndex = 0;
+        this.bgm = new Audio(this.bgmTracks[this.currentBgmIndex]);
+        this.bgm.loop = false;
 
         // Physics
         this.GRAVITY = 0.32;
@@ -226,6 +228,11 @@ class PlatformerGame {
         this.setupTouchControls();
         this.setupKeyboardControls();
 
+        // เมื่อเพลงปัจจุบันจบ ให้สลับไปเล่นเพลงถัดไปใน Playlist
+        this.bgm.addEventListener('ended', () => {
+            this.playNextBGM();
+        });
+
         const unlockAudio = () => {
             this.sfx.init();
             this.updateBGMState();
@@ -241,6 +248,16 @@ class PlatformerGame {
 
         this.resetEntities();
         this.gameLoop();
+    }
+
+    playNextBGM() {
+        this.currentBgmIndex = (this.currentBgmIndex + 1) % this.bgmTracks.length;
+        this.bgm.src = this.bgmTracks[this.currentBgmIndex];
+        this.bgm.playbackRate = this.isLavaNear ? 1.25 : 1.0;
+        const state = store.getState();
+        if (state.soundEnabled && state.activeTab === 'game' && !state.isGameOver) {
+            this.bgm.play().catch(() => {});
+        }
     }
 
     triggerShake(intensity = 8, duration = 12) {
@@ -278,6 +295,7 @@ class PlatformerGame {
         const state = store.getState();
         if (state.soundEnabled && state.activeTab === 'game' && !state.isGameOver) {
             if (this.bgm.paused) {
+                this.bgm.playbackRate = this.isLavaNear ? 1.25 : 1.0;
                 this.bgm.play().catch(() => {});
             }
         } else {
@@ -820,6 +838,8 @@ class PlatformerGame {
     restartGame() {
         store.resetScore();
         this.resetEntities();
+        this.currentBgmIndex = 0;
+        this.bgm.src = this.bgmTracks[this.currentBgmIndex];
         this.bgm.currentTime = 0;
         this.updateBGMState();
     }
