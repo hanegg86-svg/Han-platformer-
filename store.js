@@ -8,10 +8,11 @@ class Store {
             soundEnabled: JSON.parse(localStorage.getItem('platformer_sound') ?? 'true'),
             isGameOver: false,
             level: 1,
-            selectedSkin: localStorage.getItem('platformer_skin') || 'fire', // 'fire', 'electric', 'gold'
+            selectedSkin: localStorage.getItem('platformer_skin') || 'fire',
             ownedSkins: JSON.parse(localStorage.getItem('platformer_owned_skins') || '["fire"]'),
             upgrades: JSON.parse(localStorage.getItem('platformer_upgrades') || '{"dashLevel": 0, "magnetLevel": 0}'),
-            coinsCount: parseInt(localStorage.getItem('platformer_coins') || '0', 10)
+            coinsCount: parseInt(localStorage.getItem('platformer_coins') || '0', 10),
+            fireballLevel: parseInt(localStorage.getItem('platformer_fireball_level') || '1', 10)
         };
         this.listeners = [];
     }
@@ -45,6 +46,12 @@ class Store {
             this.state.highScore = this.state.score;
             localStorage.setItem('platformer_highscore', this.state.highScore.toString());
         }
+        this.notify();
+    }
+
+    upgradeFireball() {
+        this.state.fireballLevel += 1;
+        localStorage.setItem('platformer_fireball_level', this.state.fireballLevel.toString());
         this.notify();
     }
 
@@ -118,6 +125,7 @@ class Store {
         localStorage.removeItem('platformer_coins');
         localStorage.removeItem('platformer_owned_skins');
         localStorage.removeItem('platformer_upgrades');
+        localStorage.removeItem('platformer_fireball_level');
         this.state = {
             activeTab: 'game',
             score: 0,
@@ -129,7 +137,8 @@ class Store {
             selectedSkin: 'fire',
             ownedSkins: ['fire'],
             upgrades: { dashLevel: 0, magnetLevel: 0 },
-            coinsCount: 0
+            coinsCount: 0,
+            fireballLevel: 1
         };
         this.notify();
     }

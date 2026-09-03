@@ -147,7 +147,7 @@ canvas {
     font-weight: 700;
 }
 
-/* Mobile Controls - Auto-Runner Two-Handed Setup */
+/* Mobile Controls - Auto-Runner Layout */
 .touch-controls {
     height: 130px;
     flex-shrink: 0;
@@ -155,19 +155,19 @@ canvas {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 14px;
+    padding: 10px 16px;
     border-top: 3px solid #000000;
 }
 
 .left-controls, .action-btns {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
 }
 
 .touch-btn {
-    width: 52px;
-    height: 52px;
+    width: 54px;
+    height: 54px;
     border-radius: 50%;
     border: 3px solid #000000;
     background-color: #38bdf8;
@@ -190,11 +190,11 @@ canvas {
 }
 
 .btn-action {
-    width: 68px;
-    height: 52px;
-    border-radius: 26px;
+    width: 72px;
+    height: 54px;
+    border-radius: 27px;
     background-color: #22c55e;
-    font-size: 0.88rem;
+    font-size: 0.9rem;
 }
 
 .btn-action:active, .btn-action.pressed {
@@ -202,12 +202,12 @@ canvas {
 }
 
 .btn-dash {
-    width: 60px;
-    height: 52px;
-    border-radius: 26px;
+    width: 64px;
+    height: 54px;
+    border-radius: 27px;
     background-color: #facc15;
     color: #000000;
-    font-size: 0.86rem;
+    font-size: 0.88rem;
     text-shadow: none;
 }
 
@@ -215,46 +215,34 @@ canvas {
     background-color: #eab308;
 }
 
-.btn-magic {
-    width: 60px;
-    height: 52px;
-    border-radius: 26px;
-    background-color: #8b5cf6;
+/* ปุ่มยิงลูกไฟเพลิง */
+.btn-fire {
+    width: 68px;
+    height: 54px;
+    border-radius: 27px;
+    background-color: #f97316;
     color: #ffffff;
-    font-size: 0.86rem;
+    font-size: 0.88rem;
     text-shadow: 1px 1px 0px #000;
 }
 
-.btn-magic:active, .btn-magic.pressed {
-    background-color: #7c3aed;
+.btn-fire:active, .btn-fire.pressed {
+    background-color: #ea580c;
 }
 
+/* ปุ่มทุบพื้น */
 .btn-slam {
-    width: 60px;
-    height: 52px;
-    border-radius: 26px;
+    width: 64px;
+    height: 54px;
+    border-radius: 27px;
     background-color: #ef4444;
     color: #ffffff;
-    font-size: 0.86rem;
+    font-size: 0.88rem;
     text-shadow: 1px 1px 0px #000;
 }
 
 .btn-slam:active, .btn-slam.pressed {
     background-color: #dc2626;
-}
-
-.btn-spell-switch {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background-color: #0284c7;
-    color: #ffffff;
-    font-size: 1.15rem;
-    text-shadow: none;
-}
-
-.btn-spell-switch:active, .btn-spell-switch.pressed {
-    background-color: #0369a1;
 }
 
 /* UI Cards */
@@ -459,20 +447,14 @@ canvas {
     }
 
     .btn-action {
-        width: 84px;
+        width: 86px;
         height: 60px;
         font-size: 1rem;
     }
 
-    .btn-dash, .btn-magic, .btn-slam {
-        width: 74px;
+    .btn-dash, .btn-fire, .btn-slam {
+        width: 78px;
         height: 60px;
         font-size: 0.95rem;
-    }
-
-    .btn-spell-switch {
-        width: 56px;
-        height: 56px;
-        font-size: 1.3rem;
     }
 }
