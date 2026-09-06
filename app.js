@@ -153,8 +153,12 @@ class PlatformerGame {
         this.enemyImg.src = 'enemy.png';
 
         // Controls
-        this.keys = { jump: false, dash: false, fire: false };
+        this.keys = { jump: false, dash: false, fire: false, stop: false };
+        this.isStopping = false;
         this.animationFrameId = null;
+
+        // Dynamic Lighting Canvas for Dark Cave
+        this.lightCanvas = null;
 
         // BGM Playlist
         this.bgmTracks = ['bgm.mp3', 'bgm2.mp3'];
@@ -310,14 +314,21 @@ class PlatformerGame {
         const container = this.canvas.parentElement;
         this.canvas.width = container.clientWidth;
         this.canvas.height = container.clientHeight;
+
+        if (!this.lightCanvas) {
+            this.lightCanvas = document.createElement('canvas');
+        }
+        this.lightCanvas.width = this.canvas.width;
+        this.lightCanvas.height = this.canvas.height;
     }
 
     getLevelData(level, w, h) {
         if (level > 40) return null;
 
         let theme = 'grass';
-        if (level >= 11 && level <= 25) theme = 'yoyle';
-        if (level >= 26) theme = 'volcano';
+        if (level >= 8 && level <= 18) theme = 'darkcave';
+        else if (level >= 19 && level <= 28) theme = 'yoyle';
+        else if (level >= 29) theme = 'volcano';
 
         const lavaSpeed = Math.min(1.0, 0.22 + (level - 1) * 0.015);
         const targetTime = Math.max(60, 95 - Math.floor((level - 1) / 2));
@@ -429,7 +440,7 @@ class PlatformerGame {
                     isUpperPath: true
                 });
 
-                // เหรียญทองก้อนโต 3 เหรียญบนทางแยกชั้นบน
+                // แถวเหรียญทองก้อนโตบนทางแยกชั้นบน
                 for (let ci = 0; ci < 3; ci++) {
                     coins.push({
                         x: currX + 40 + ci * 28,
@@ -732,7 +743,6 @@ class PlatformerGame {
             dashDirX: 1,
             dashDirY: 0,
 
-            isGroundPounding: false,
             isWallSliding: false,
             coyoteTimer: 0,
             jumpBufferTimer: 0,
@@ -785,7 +795,6 @@ class PlatformerGame {
         p.y = this.spawnPoint.y;
         p.vx = 0;
         p.vy = -5.5;
-        p.isGroundPounding = false;
         p.invincibleTimer = 75;
         p.hasShield = true;
         this.triggerShake(10, 15);
@@ -814,10 +823,35 @@ class PlatformerGame {
             btn.addEventListener('mouseleave', end);
         };
 
+        const bindHoldBtn = (id, onStateChange) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const start = (e) => {
+                e.preventDefault();
+                btn.classList.add('pressed');
+                onStateChange(true);
+            };
+            const end = (e) => {
+                e.preventDefault();
+                btn.classList.remove('pressed');
+                onStateChange(false);
+            };
+
+            btn.addEventListener('touchstart', start);
+            btn.addEventListener('touchend', end);
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('mouseup', end);
+            btn.addEventListener('mouseleave', end);
+        };
+
         bindBtn('btn-jump', () => this.handleJumpTrigger());
         bindBtn('btn-dash', () => this.handleDashTrigger());
         bindBtn('btn-fire', () => this.handleFireTrigger());
-        bindBtn('btn-slam', () => this.handleGroundPoundTrigger());
+        
+        // ปุ่มหยุดวิ่ง (เบรกฉุกเฉิน)
+        bindHoldBtn('btn-stop', (pressed) => {
+            this.isStopping = pressed;
+        });
     }
 
     setupKeyboardControls() {
@@ -827,7 +861,7 @@ class PlatformerGame {
                 this.keys.jump = true;
             }
             if (e.key === 'ArrowDown' || e.key === 's') {
-                this.handleGroundPoundTrigger();
+                this.keys.stop = true;
             }
             if (e.key === 'Shift' || e.key === 'k') this.handleDashTrigger();
             if (e.key === 'j' || e.key === 'x' || e.key === 'f') this.handleFireTrigger();
@@ -835,6 +869,7 @@ class PlatformerGame {
 
         window.addEventListener('keyup', (e) => {
             if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') this.keys.jump = false;
+            if (e.key === 'ArrowDown' || e.key === 's') this.keys.stop = false;
         });
     }
 
@@ -868,18 +903,6 @@ class PlatformerGame {
         this.tryExecuteJump();
     }
 
-    handleGroundPoundTrigger() {
-        const p = this.player;
-        if (!p || p.isGrounded || p.isGroundPounding) return;
-        p.isGroundPounding = true;
-        p.isDashing = false;
-        p.vx = 0;
-        p.vy = 12.0;
-        this.sfx.playDash();
-        this.addParticles(p.x + p.width / 2, p.y, '#ef4444', 12);
-        this.addFloatingText(p.x - 10, p.y - 15, '💥 GROUND POUND!', '#ef4444');
-    }
-
     handleDashTrigger() {
         if (this.isGameCleared) return;
         const p = this.player;
@@ -888,7 +911,6 @@ class PlatformerGame {
             p.dashDirY = 0;
 
             p.isDashing = true;
-            p.isGroundPounding = false;
             p.dashTimer = 10;
             p.dashCooldown = p.maxDashCooldown || 30;
 
@@ -939,6 +961,8 @@ class PlatformerGame {
             this.keys.jump = false;
             this.keys.dash = false;
             this.keys.fire = false;
+            this.keys.stop = false;
+            this.isStopping = false;
         }
         this.updateBGMState();
     }
@@ -1039,6 +1063,11 @@ class PlatformerGame {
                 wp.y -= wp.vy * 1.5;
                 wp.x += wp.vx;
                 if (wp.y < 0) wp.y = this.canvas.height;
+            } else if (this.currentTheme === 'darkcave') {
+                wp.y += Math.sin(this.levelTime * 0.05 + wp.x) * 0.4;
+                wp.x += wp.vx * 0.5;
+                if (wp.x < 0) wp.x = this.canvas.width;
+                if (wp.x > this.canvas.width) wp.x = 0;
             } else {
                 wp.y += wp.vy;
                 wp.x += wp.vx;
@@ -1089,9 +1118,26 @@ class PlatformerGame {
 
         const currentSpeed = p.boostTimer > 0 ? p.speed * 1.65 : p.speed;
 
-        if (p.isGroundPounding) {
+        // ระบบหยุดวิ่ง (Hold-to-Brake)
+        const isBraking = (this.keys.stop || this.isStopping) && p.isGrounded && !p.isDashing;
+
+        if (isBraking) {
             p.vx = 0;
-            p.vy = 14.0;
+            p.vy += this.GRAVITY;
+
+            // เอฟเฟกต์สะเก็ดฝุ่นไถลที่เท้าขณะเบรก
+            if (Math.random() < 0.4) {
+                this.particles.push({
+                    x: p.x + 8,
+                    y: p.y + p.height - 2,
+                    vx: -(Math.random() * 1.5 + 0.8),
+                    vy: -Math.random() * 1.2,
+                    size: Math.random() * 3 + 2,
+                    color: '#94a3b8',
+                    alpha: 0.65,
+                    life: 14
+                });
+            }
         } else if (p.isDashing) {
             p.vx = p.dashDirX * currentSpeed * 2.5;
             p.vy = p.dashDirY * currentSpeed * 2.5;
@@ -1108,7 +1154,7 @@ class PlatformerGame {
         p.x += p.vx;
         p.y += p.vy;
 
-        if (p.vx !== 0 || p.vy !== 0 || p.isDashing || p.isGroundPounding) {
+        if (p.vx !== 0 || p.vy !== 0 || p.isDashing) {
             p.trail.push({
                 x: p.x + p.width / 2,
                 y: p.y + p.height / 2,
@@ -1182,7 +1228,7 @@ class PlatformerGame {
                 p.y < vine.y + vine.height &&
                 p.y + p.height > vine.y
             ) {
-                if (p.isDashing || p.isGroundPounding) {
+                if (p.isDashing) {
                     vine.isBurned = true;
                     this.sfx.playBurn();
                     this.triggerShake(8, 10);
@@ -1412,33 +1458,6 @@ class PlatformerGame {
                 p.y + p.height <= plat.y + plat.height + p.vy &&
                 p.vy >= 0
             ) {
-                if (p.isGroundPounding) {
-                    p.isGroundPounding = false;
-                    this.triggerShake(14, 18);
-                    this.sfx.playHit();
-                    this.addParticles(p.x + p.width / 2, plat.y, '#ef4444', 25);
-                    this.addFloatingText(p.x - 20, plat.y - 20, 'SHOCKWAVE!', '#ef4444');
-
-                    this.enemies.forEach(enemy => {
-                        if (!enemy.isDefeated && Math.abs((enemy.x + enemy.width / 2) - (p.x + p.width / 2)) < 110) {
-                            enemy.isDefeated = true;
-                            store.addScore(75);
-                            p.mp = Math.min(p.maxMp, p.mp + 20);
-                            this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 15);
-                        }
-                    });
-
-                    // ทำลายหินย้อยที่อยู่ใกล้เคียง
-                    this.stalactites.forEach(st => {
-                        if (!st.isDestroyed && Math.abs((st.x + st.width / 2) - (p.x + p.width / 2)) < 140) {
-                            st.isDestroyed = true;
-                            store.addScore(40);
-                            this.addParticles(st.x + st.width / 2, st.y + st.height / 2, '#78716c', 16);
-                            this.addFloatingText(st.x, st.y - 10, '💥 หินพัง! +40', '#facc15');
-                        }
-                    });
-                }
-
                 if (plat.type === 'bounce') {
                     p.vy = -11.5;
                     p.isGrounded = false;
@@ -1876,7 +1895,29 @@ class PlatformerGame {
         const time = this.levelTime * 0.02;
         const parallaxX = this.cameraX * 0.2;
 
-        if (this.currentTheme === 'volcano') {
+        if (this.currentTheme === 'darkcave') {
+            const caveGrad = this.ctx.createLinearGradient(0, 0, 0, h);
+            caveGrad.addColorStop(0, '#030712');
+            caveGrad.addColorStop(0.6, '#090d16');
+            caveGrad.addColorStop(1, '#0f172a');
+            this.ctx.fillStyle = caveGrad;
+            this.ctx.fillRect(0, 0, w, h);
+
+            this.ctx.fillStyle = '#050811';
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, h);
+            for (let x = 0; x <= w; x += 25) {
+                const worldX = x + parallaxX;
+                const y = h - 90 - Math.sin(worldX * 0.012) * 40 - Math.cos(worldX * 0.02) * 20;
+                this.ctx.lineTo(x, y);
+            }
+            this.ctx.lineTo(w, h);
+            this.ctx.fill();
+            this.ctx.stroke();
+
+        } else if (this.currentTheme === 'volcano') {
             const caveGrad = this.ctx.createLinearGradient(0, 0, 0, h);
             caveGrad.addColorStop(0, '#1a0b08');
             caveGrad.addColorStop(0.5, '#2d120a');
@@ -2167,6 +2208,9 @@ class PlatformerGame {
             } else if (plat.type === 'phase') {
                 bodyColor = '#0891b2';
                 topColor = '#67e8f9';
+            } else if (this.currentTheme === 'darkcave') {
+                bodyColor = plat.type === 'crumble' ? '#27272a' : '#090d16';
+                topColor = plat.type === 'crumble' ? '#a1a1aa' : '#38bdf8';
             } else if (this.currentTheme === 'volcano') {
                 bodyColor = plat.type === 'crumble' ? '#451a03' : '#1c1917';
                 topColor = plat.type === 'crumble' ? '#f97316' : '#dc2626';
@@ -2542,6 +2586,77 @@ class PlatformerGame {
         });
 
         this.ctx.restore();
+
+        // 2. ระบบไฟส่องสว่างในความมืด (Dark Cave Dynamic Lighting Mask)
+        if (this.currentTheme === 'darkcave' && this.lightCanvas) {
+            const lctx = this.lightCanvas.getContext('2d');
+            lctx.clearRect(0, 0, this.lightCanvas.width, this.lightCanvas.height);
+
+            // ฉาบความมืดสนิท
+            lctx.fillStyle = 'rgba(3, 7, 18, 0.94)';
+            lctx.fillRect(0, 0, this.lightCanvas.width, this.lightCanvas.height);
+
+            // เจาะช่องแสงสว่าง (Destination-Out)
+            lctx.globalCompositeOperation = 'destination-out';
+
+            // รัศมีแสงไฟติดตัวผู้เล่น
+            const screenPx = p.x - this.cameraX + p.width / 2;
+            const screenPy = p.y + p.height / 2;
+            const playerLightRadius = 145;
+
+            const pGrad = lctx.createRadialGradient(screenPx, screenPy, 15, screenPx, screenPy, playerLightRadius);
+            pGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+            pGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.85)');
+            pGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            lctx.fillStyle = pGrad;
+            lctx.beginPath();
+            lctx.arc(screenPx, screenPy, playerLightRadius, 0, Math.PI * 2);
+            lctx.fill();
+
+            // แสงสว่างจากลูกไฟเพลิง (ส่องสว่างทางข้างหน้า)
+            this.spells.forEach(sp => {
+                const spX = sp.x - this.cameraX;
+                const spY = sp.y;
+                const spellRadius = 175 + sp.radius * 2.5;
+
+                const spGrad = lctx.createRadialGradient(spX, spY, 12, spX, spY, spellRadius);
+                spGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+                spGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.8)');
+                spGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                lctx.fillStyle = spGrad;
+                lctx.beginPath();
+                lctx.arc(spX, spY, spellRadius, 0, Math.PI * 2);
+                lctx.fill();
+            });
+
+            // แสงสว่างจากกำแพงลาวาด้านหลัง
+            if (this.lava) {
+                const lavaX = this.lava.x - this.cameraX;
+                if (lavaX > -250 && lavaX < this.canvas.width) {
+                    const lavaGrad = lctx.createLinearGradient(lavaX - 80, 0, lavaX + 160, 0);
+                    lavaGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+                    lavaGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    lctx.fillStyle = lavaGrad;
+                    lctx.fillRect(lavaX - 100, 0, 260, this.canvas.height);
+                }
+            }
+
+            // แสงสว่างจากเส้นชัย
+            if (this.goal) {
+                const gX = this.goal.x - this.cameraX + this.goal.width / 2;
+                const gY = this.goal.y + this.goal.height / 2;
+                const gGrad = lctx.createRadialGradient(gX, gY, 15, gX, gY, 120);
+                gGrad.addColorStop(0, 'rgba(0, 0, 0, 0.9)');
+                gGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                lctx.fillStyle = gGrad;
+                lctx.beginPath();
+                lctx.arc(gX, gY, 120, 0, Math.PI * 2);
+                lctx.fill();
+            }
+
+            lctx.globalCompositeOperation = 'source-over';
+            this.ctx.drawImage(this.lightCanvas, 0, 0);
+        }
 
         // 3. HUD Info
         const elapsed = Math.floor(this.levelTime / 60);

@@ -230,19 +230,19 @@ canvas {
     background-color: #ea580c;
 }
 
-/* ปุ่มทุบพื้น */
-.btn-slam {
+/* ปุ่มหยุดวิ่ง (เบรกฉุกเฉิน) */
+.btn-stop {
     width: 64px;
     height: 54px;
     border-radius: 27px;
-    background-color: #ef4444;
+    background-color: #f43f5e;
     color: #ffffff;
     font-size: 0.88rem;
     text-shadow: 1px 1px 0px #000;
 }
 
-.btn-slam:active, .btn-slam.pressed {
-    background-color: #dc2626;
+.btn-stop:active, .btn-stop.pressed {
+    background-color: #e11d48;
 }
 
 /* UI Cards */
@@ -452,7 +452,7 @@ canvas {
         font-size: 1rem;
     }
 
-    .btn-dash, .btn-fire, .btn-slam {
+    .btn-dash, .btn-fire, .btn-stop {
         width: 78px;
         height: 60px;
         font-size: 0.95rem;
