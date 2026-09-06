@@ -157,6 +157,10 @@ class PlatformerGame {
         this.isStopping = false;
         this.animationFrameId = null;
 
+        // Pause State & Elements
+        this.isPaused = false;
+        this.pauseOverlay = document.getElementById('pause-overlay');
+
         // Dynamic Lighting Canvas for Dark Cave
         this.lightCanvas = null;
 
@@ -183,7 +187,6 @@ class PlatformerGame {
         this.spells = [];
         this.checkpoints = [];
         this.spawnPoint = { x: 50, y: 0 };
-        this.lava = null;
         this.goal = null;
 
         // Puzzle & Dynamic Entities
@@ -210,7 +213,6 @@ class PlatformerGame {
         this.comboCount = 0;
         this.comboTimer = 0;
 
-        this.isLavaNear = false;
         this.currentTheme = 'grass';
 
         this.levelTime = 0;
@@ -234,6 +236,7 @@ class PlatformerGame {
 
         this.setupTouchControls();
         this.setupKeyboardControls();
+        this.setupLifecycleControls();
 
         // เมื่อเพลงปัจจุบันจบ ให้สลับไปเล่นเพลงถัดไปใน Playlist
         this.bgm.addEventListener('ended', () => {
@@ -257,12 +260,80 @@ class PlatformerGame {
         this.gameLoop();
     }
 
+    setupLifecycleControls() {
+        // ปุ่ม Pause บนหน้าจอ
+        const btnPause = document.getElementById('btn-pause');
+        if (btnPause) {
+            btnPause.addEventListener('click', () => this.togglePause());
+        }
+
+        // ปุ่มเล่นต่อ และเริ่มใหม่ในหน้าต่าง Pause
+        const btnResume = document.getElementById('btn-resume');
+        if (btnResume) {
+            btnResume.addEventListener('click', () => this.resumeGame());
+        }
+
+        const btnPauseRestart = document.getElementById('btn-pause-restart');
+        if (btnPauseRestart) {
+            btnPauseRestart.addEventListener('click', () => {
+                this.resumeGame();
+                this.restartGame();
+            });
+        }
+
+        // Auto-Pause เมื่อปิดจอ สลับแท็บ หรือออกจากแอป
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.pauseGame();
+            }
+        });
+
+        window.addEventListener('blur', () => {
+            this.pauseGame();
+        });
+
+        window.addEventListener('pagehide', () => {
+            this.pauseGame();
+        });
+    }
+
+    pauseGame() {
+        const state = store.getState();
+        if (state.isGameOver || this.isGameCleared || state.activeTab !== 'game' || this.isPaused) return;
+
+        this.isPaused = true;
+        if (this.pauseOverlay) {
+            this.pauseOverlay.classList.remove('hidden');
+        }
+        if (this.bgm && !this.bgm.paused) {
+            this.bgm.pause();
+        }
+    }
+
+    resumeGame() {
+        if (!this.isPaused) return;
+
+        this.isPaused = false;
+        if (this.pauseOverlay) {
+            this.pauseOverlay.classList.add('hidden');
+        }
+        this.updateBGMState();
+    }
+
+    togglePause() {
+        if (this.isPaused) {
+            this.resumeGame();
+        } else {
+            this.pauseGame();
+        }
+    }
+
     playNextBGM() {
         this.currentBgmIndex = (this.currentBgmIndex + 1) % this.bgmTracks.length;
         this.bgm.src = this.bgmTracks[this.currentBgmIndex];
-        this.bgm.playbackRate = this.isLavaNear ? 1.25 : 1.0;
+        this.bgm.playbackRate = 1.0;
         const state = store.getState();
-        if (state.soundEnabled && state.activeTab === 'game' && !state.isGameOver) {
+        if (state.soundEnabled && state.activeTab === 'game' && !state.isGameOver && !this.isPaused) {
             this.bgm.play().catch(() => {});
         }
     }
@@ -300,9 +371,9 @@ class PlatformerGame {
 
     updateBGMState() {
         const state = store.getState();
-        if (state.soundEnabled && state.activeTab === 'game' && !state.isGameOver) {
+        if (state.soundEnabled && state.activeTab === 'game' && !state.isGameOver && !this.isPaused) {
             if (this.bgm.paused) {
-                this.bgm.playbackRate = this.isLavaNear ? 1.25 : 1.0;
+                this.bgm.playbackRate = 1.0;
                 this.bgm.play().catch(() => {});
             }
         } else {
@@ -330,7 +401,6 @@ class PlatformerGame {
         else if (level >= 19 && level <= 28) theme = 'yoyle';
         else if (level >= 29) theme = 'volcano';
 
-        const lavaSpeed = Math.min(1.0, 0.22 + (level - 1) * 0.015);
         const targetTime = Math.max(60, 95 - Math.floor((level - 1) / 2));
 
         const allowedTypes = ['normal'];
@@ -650,7 +720,6 @@ class PlatformerGame {
         return {
             theme,
             targetTime,
-            lavaSpeed,
             levelWidth,
             checkpoints,
             platforms,
@@ -782,11 +851,6 @@ class PlatformerGame {
         this.speedPads = levelData.speedPads || [];
         this.geysers = levelData.geysers || [];
         this.stalactites = levelData.stalactites || [];
-
-        this.lava = {
-            x: -250,
-            speed: levelData.lavaSpeed
-        };
     }
 
     respawnAtCheckpoint() {
@@ -856,6 +920,10 @@ class PlatformerGame {
 
     setupKeyboardControls() {
         window.addEventListener('keydown', (e) => {
+            if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+                this.togglePause();
+                return;
+            }
             if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') {
                 if (!this.keys.jump) this.handleJumpTrigger();
                 this.keys.jump = true;
@@ -875,7 +943,7 @@ class PlatformerGame {
 
     tryExecuteJump() {
         const p = this.player;
-        if (!p) return false;
+        if (!p || this.isPaused) return false;
 
         if (p.isGrounded || p.coyoteTimer > 0) {
             p.vy = p.jumpPower;
@@ -898,13 +966,13 @@ class PlatformerGame {
     }
 
     handleJumpTrigger() {
-        if (this.isGameCleared) return;
+        if (this.isGameCleared || this.isPaused) return;
         this.player.jumpBufferTimer = 8;
         this.tryExecuteJump();
     }
 
     handleDashTrigger() {
-        if (this.isGameCleared) return;
+        if (this.isGameCleared || this.isPaused) return;
         const p = this.player;
         if (p.dashCooldown <= 0 && !p.isDashing) {
             p.dashDirX = 1;
@@ -921,7 +989,7 @@ class PlatformerGame {
     }
 
     handleFireTrigger() {
-        if (this.isGameCleared) return;
+        if (this.isGameCleared || this.isPaused) return;
         const p = this.player;
         if (!p || p.magicCooldown > 0) return;
 
@@ -958,6 +1026,7 @@ class PlatformerGame {
 
     handleTabChange(tab) {
         if (tab !== 'game') {
+            this.pauseGame();
             this.keys.jump = false;
             this.keys.dash = false;
             this.keys.fire = false;
@@ -968,6 +1037,8 @@ class PlatformerGame {
     }
 
     restartGame() {
+        if (this.pauseOverlay) this.pauseOverlay.classList.add('hidden');
+        this.isPaused = false;
         store.resetScore();
         this.resetEntities();
         this.currentBgmIndex = 0;
@@ -977,7 +1048,7 @@ class PlatformerGame {
     }
 
     handlePlayerDamage() {
-        if (this.isGameCleared) return;
+        if (this.isGameCleared || this.isPaused) return;
         const p = this.player;
         if (p.invincibleTimer > 0) return;
 
@@ -1009,7 +1080,7 @@ class PlatformerGame {
 
     update() {
         const state = store.getState();
-        if (state.isGameOver || state.activeTab !== 'game' || this.isGameCleared) return;
+        if (state.isGameOver || state.activeTab !== 'game' || this.isGameCleared || this.isPaused) return;
 
         if (this.hitFreezeTimer > 0) {
             this.hitFreezeTimer--;
@@ -1024,17 +1095,6 @@ class PlatformerGame {
 
         const targetCamX = Math.max(0, p.x - this.canvas.width * 0.3);
         this.cameraX += (targetCamX - this.cameraX) * 0.1;
-
-        if (this.lava) {
-            const lavaDist = p.x - this.lava.x;
-            if (lavaDist < 180) {
-                if (this.bgm) this.bgm.playbackRate = 1.25;
-                this.isLavaNear = true;
-            } else {
-                if (this.bgm) this.bgm.playbackRate = 1.0;
-                this.isLavaNear = false;
-            }
-        }
 
         if (this.comboTimer > 0) {
             this.comboTimer--;
@@ -1105,13 +1165,6 @@ class PlatformerGame {
                 }
             }
         });
-
-        if (this.lava) {
-            this.lava.x += this.lava.speed;
-            if (p.x < this.lava.x) {
-                this.handlePlayerDamage();
-            }
-        }
 
         if (p.boostTimer > 0) p.boostTimer--;
         if (p.magnetTimer > 0) p.magnetTimer--;
@@ -2136,27 +2189,6 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // กำแพงลาวาไล่หลัง
-        if (this.lava) {
-            this.ctx.save();
-            this.ctx.fillStyle = '#ef4444';
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 4;
-
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.lava.x - 500, 0);
-
-            for (let y = 0; y <= this.canvas.height; y += 10) {
-                const waveX = this.lava.x + Math.sin((y + this.levelTime * 4) * 0.04) * 8;
-                this.ctx.lineTo(waveX, y);
-            }
-            this.ctx.lineTo(this.lava.x - 500, this.canvas.height);
-            this.ctx.closePath();
-            this.ctx.fill();
-            this.ctx.stroke();
-            this.ctx.restore();
-        }
-
         // เส้นชัย Goal
         if (this.goal) {
             this.ctx.save();
@@ -2587,7 +2619,7 @@ class PlatformerGame {
 
         this.ctx.restore();
 
-        // 2. ระบบไฟส่องสว่างในความมืด (Dark Cave Dynamic Lighting Mask)
+        // ระบบไฟส่องสว่างในความมืด (Dark Cave Dynamic Lighting Mask)
         if (this.currentTheme === 'darkcave' && this.lightCanvas) {
             const lctx = this.lightCanvas.getContext('2d');
             lctx.clearRect(0, 0, this.lightCanvas.width, this.lightCanvas.height);
@@ -2629,18 +2661,6 @@ class PlatformerGame {
                 lctx.fill();
             });
 
-            // แสงสว่างจากกำแพงลาวาด้านหลัง
-            if (this.lava) {
-                const lavaX = this.lava.x - this.cameraX;
-                if (lavaX > -250 && lavaX < this.canvas.width) {
-                    const lavaGrad = lctx.createLinearGradient(lavaX - 80, 0, lavaX + 160, 0);
-                    lavaGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-                    lavaGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                    lctx.fillStyle = lavaGrad;
-                    lctx.fillRect(lavaX - 100, 0, 260, this.canvas.height);
-                }
-            }
-
             // แสงสว่างจากเส้นชัย
             if (this.goal) {
                 const gX = this.goal.x - this.cameraX + this.goal.width / 2;
@@ -2658,7 +2678,7 @@ class PlatformerGame {
             this.ctx.drawImage(this.lightCanvas, 0, 0);
         }
 
-        // 3. HUD Info
+        // HUD Info
         const elapsed = Math.floor(this.levelTime / 60);
         this.ctx.font = 'bold 13px sans-serif';
         this.ctx.fillStyle = '#ffffff';
@@ -2703,17 +2723,6 @@ class PlatformerGame {
             this.ctx.fillStyle = '#f59e0b';
             this.ctx.font = 'bold 14px sans-serif';
             this.ctx.fillText(`🔥 COMBO x${currentMult} (${this.comboCount})`, 12, 84);
-        }
-
-        if (this.isLavaNear) {
-            this.ctx.fillStyle = `rgba(239, 68, 68, ${0.15 + Math.sin(this.levelTime * 0.2) * 0.1})`;
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-            this.ctx.fillStyle = '#ef4444';
-            this.ctx.font = 'bold 14px sans-serif';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText('⚠️ ระวังกำแพงลาวาไล่หลัง!', this.canvas.width / 2, 25);
-            this.ctx.textAlign = 'left';
         }
 
         if (this.bannerTimer > 0) {

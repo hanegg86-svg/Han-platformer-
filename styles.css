@@ -104,6 +104,34 @@ canvas {
     height: 100%;
 }
 
+/* ปุ่มหยุดเกมแบบลอยมุมขวาบน */
+.btn-pause-toggle {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 3px solid #000000;
+    background-color: rgba(15, 23, 42, 0.82);
+    color: #ffffff;
+    font-size: 1.15rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    box-shadow: 3px 3px 0px #000000;
+    touch-action: manipulation;
+    transition: transform 0.05s ease, background-color 0.1s ease;
+}
+
+.btn-pause-toggle:active {
+    transform: translate(2px, 2px);
+    background-color: #0f172a;
+    box-shadow: 1px 1px 0px #000000;
+}
+
 /* Overlay Modal */
 .overlay {
     position: absolute;

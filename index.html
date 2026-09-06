@@ -11,7 +11,7 @@
 
     <title>Platformer Pro - Auto-Run Fireball Action</title>
     <!-- อัปเดต Version Query String ตัดแคช CSS -->
-    <link rel="stylesheet" href="styles.css?v=18">
+    <link rel="stylesheet" href="styles.css?v=19">
     
     <!-- App Icon Config -->
     <meta name="theme-color" content="#0f172a">
@@ -38,6 +38,19 @@
                 <div class="canvas-container">
                     <canvas id="gameCanvas"></canvas>
                     
+                    <!-- ปุ่มหยุดเกม (Pause Button) -->
+                    <button id="btn-pause" class="btn-pause-toggle" title="หยุดเกม">⏸️</button>
+
+                    <!-- Pause Overlay Modal -->
+                    <div id="pause-overlay" class="overlay hidden">
+                        <div class="modal-card">
+                            <h2 style="color: #38bdf8;">พักเกม</h2>
+                            <p>เกมหยุดชั่วคราว</p>
+                            <button id="btn-resume" class="btn btn-primary" style="margin-bottom: 12px;">▶️ เล่นต่อ</button>
+                            <button id="btn-pause-restart" class="btn btn-danger">🔄 เริ่มด่านใหม่</button>
+                        </div>
+                    </div>
+
                     <!-- Game Over Overlay Modal -->
                     <div id="game-over-overlay" class="overlay hidden">
                         <div class="modal-card">
@@ -135,6 +148,6 @@
     </div>
 
     <!-- อัปเดต Version Query String ตัดแคช JS -->
-    <script type="module" src="app.js?v=18"></script>
+    <script type="module" src="app.js?v=19"></script>
 </body>
 </html>
