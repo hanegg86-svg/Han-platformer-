@@ -432,7 +432,7 @@ class PlatformerGame {
         let boss = null;
 
         let currX = 0;
-        platforms.push({ x: 0, y: h - 35, width: 340, height: 35, type: 'normal' });
+        platforms.push({ x: 0, y: h - 35, width: 340, height: 35, type: 'normal', props: [] });
         currX = 340;
 
         let platformId = 0;
@@ -474,12 +474,36 @@ class PlatformerGame {
                 pType = allowedTypes[typeIdx] || 'normal';
             }
 
+            // สุ่มพร็อพตกแต่งบนผิวแพลตฟอร์ม (Decor Props)
+            const platformProps = [];
+            if (pType === 'normal' || pType === 'ice') {
+                const propCount = Math.floor(seed * 3) + 1;
+                for (let pi = 0; pi < propCount; pi++) {
+                    const propSubSeed = Math.abs(Math.sin(platformId * 41.13 + pi * 17.82));
+                    let pKind = 'pebble';
+                    if (theme === 'grass') {
+                        pKind = propSubSeed > 0.5 ? 'grass_flower' : 'grass_tuft';
+                    } else if (theme === 'darkcave') {
+                        pKind = propSubSeed > 0.45 ? 'glow_mushroom' : 'pebble';
+                    } else if (theme === 'yoyle') {
+                        pKind = propSubSeed > 0.5 ? 'crystal_shard' : 'pebble';
+                    } else if (theme === 'volcano') {
+                        pKind = propSubSeed > 0.5 ? 'magma_rock' : 'pebble';
+                    }
+                    platformProps.push({
+                        relX: 18 + propSubSeed * (platWidth - 40),
+                        kind: pKind
+                    });
+                }
+            }
+
             const platObj = {
                 x: currX,
                 y: platY,
                 width: platWidth,
                 height: 35,
-                type: pType
+                type: pType,
+                props: platformProps
             };
 
             if (pType === 'phase') {
@@ -508,7 +532,8 @@ class PlatformerGame {
                     width: upperWidth,
                     height: 26,
                     type: 'normal',
-                    isUpperPath: true
+                    isUpperPath: true,
+                    props: [{ relX: 30, kind: 'crystal_shard' }]
                 });
 
                 // แถวเหรียญทองก้อนโตบนทางแยกชั้นบน
@@ -675,7 +700,7 @@ class PlatformerGame {
         }
 
         const lastPlatY = h - 35;
-        platforms.push({ x: levelWidth - 360, y: lastPlatY, width: 360, height: 35, type: 'normal' });
+        platforms.push({ x: levelWidth - 360, y: lastPlatY, width: 360, height: 35, type: 'normal', props: [] });
 
         [0.25, 0.50, 0.75].forEach((ratio) => {
             const cpX = levelWidth * ratio;
@@ -756,7 +781,7 @@ class PlatformerGame {
         this.comboCount = 0;
         this.comboTimer = 0;
 
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 22; i++) {
             this.weatherParticles.push({
                 x: Math.random() * w,
                 y: Math.random() * h,
@@ -1956,50 +1981,96 @@ class PlatformerGame {
         if (this.bannerTimer > 0) this.bannerTimer--;
     }
 
+    // 4-Layer Dynamic Parallax Background
     drawDynamicBackground() {
         const w = this.canvas.width;
         const h = this.canvas.height;
-        const time = this.levelTime * 0.02;
-        const parallaxX = this.cameraX * 0.2;
+        const time = this.levelTime * 0.015;
+
+        // Layer Parallax Shifts
+        const p1 = this.cameraX * 0.03; // Layer 1: ฟ้าไกล/ดาว/พระอาทิตย์
+        const p2 = this.cameraX * 0.10; // Layer 2: ภูเขา/เสาหินไกล
+        const p3 = this.cameraX * 0.26; // Layer 3: เนินเขา/ป่าไม้/ผนังถ้ำชั้นกลาง
 
         if (this.currentTheme === 'darkcave') {
+            // Layer 1: Sky / Abyss Gradient
             const caveGrad = this.ctx.createLinearGradient(0, 0, 0, h);
-            caveGrad.addColorStop(0, '#030712');
-            caveGrad.addColorStop(0.6, '#090d16');
+            caveGrad.addColorStop(0, '#020617');
+            caveGrad.addColorStop(0.65, '#090d16');
             caveGrad.addColorStop(1, '#0f172a');
             this.ctx.fillStyle = caveGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            this.ctx.fillStyle = '#050811';
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 3;
+            // Layer 2: Distant Colossal Cavern Pillars (เสาหินยักษ์ในเงามืด)
+            this.ctx.fillStyle = '#050a17';
+            for (let i = -1; i < Math.ceil(w / 160) + 2; i++) {
+                const pilX = i * 160 - (p2 % 160);
+                this.ctx.beginPath();
+                this.ctx.moveTo(pilX, 0);
+                this.ctx.lineTo(pilX + 40, 0);
+                this.ctx.lineTo(pilX + 26, h);
+                this.ctx.lineTo(pilX - 10, h);
+                this.ctx.fill();
+            }
+
+            // Layer 3: Midground Jagged Rock Formations (สันหินชั้นกลาง)
+            this.ctx.fillStyle = '#0b1329';
+            this.ctx.strokeStyle = '#020617';
+            this.ctx.lineWidth = 2.5;
             this.ctx.beginPath();
-            this.ctx.moveTo(0, h);
-            for (let x = 0; x <= w; x += 25) {
-                const worldX = x + parallaxX;
-                const y = h - 90 - Math.sin(worldX * 0.012) * 40 - Math.cos(worldX * 0.02) * 20;
+            this.ctx.moveTo(-20, h);
+            for (let x = -20; x <= w + 20; x += 30) {
+                const worldX = x + p3;
+                const y = h - 90 - Math.sin(worldX * 0.012) * 45 - Math.cos(worldX * 0.024) * 20;
                 this.ctx.lineTo(x, y);
             }
-            this.ctx.lineTo(w, h);
+            this.ctx.lineTo(w + 20, h);
             this.ctx.fill();
             this.ctx.stroke();
 
         } else if (this.currentTheme === 'volcano') {
-            const caveGrad = this.ctx.createLinearGradient(0, 0, 0, h);
-            caveGrad.addColorStop(0, '#1a0b08');
-            caveGrad.addColorStop(0.5, '#2d120a');
-            caveGrad.addColorStop(1, '#4a1505');
-            this.ctx.fillStyle = caveGrad;
+            // Layer 1: Smoke & Ash Atmosphere
+            const volcanoGrad = this.ctx.createLinearGradient(0, 0, 0, h);
+            volcanoGrad.addColorStop(0, '#150604');
+            volcanoGrad.addColorStop(0.5, '#290e06');
+            volcanoGrad.addColorStop(1, '#4c1507');
+            this.ctx.fillStyle = volcanoGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            this.ctx.fillStyle = '#1c0a06';
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 3;
+            // Blood Sun / Eclipse
+            const sunX = (w * 0.75 - p1) % (w + 100);
+            this.ctx.save();
+            const sunGrad = this.ctx.createRadialGradient(sunX, 85, 8, sunX, 85, 55);
+            sunGrad.addColorStop(0, 'rgba(239, 68, 68, 0.7)');
+            sunGrad.addColorStop(0.5, 'rgba(220, 38, 38, 0.25)');
+            sunGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            this.ctx.fillStyle = sunGrad;
+            this.ctx.beginPath();
+            this.ctx.arc(sunX, 85, 55, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+
+            // Layer 2: Distant Fiery Peaks (แนวภูเขาไฟไกล)
+            this.ctx.fillStyle = '#1e0b07';
             this.ctx.beginPath();
             this.ctx.moveTo(0, h);
-            for (let x = 0; x <= w; x += 20) {
-                const worldX = x + parallaxX;
-                const y = h - 110 - Math.sin(worldX * 0.01) * 35;
+            for (let x = 0; x <= w + 30; x += 35) {
+                const worldX = x + p2;
+                const y = h - 130 - Math.abs(Math.sin(worldX * 0.009)) * 60;
+                this.ctx.lineTo(x, y);
+            }
+            this.ctx.lineTo(w, h);
+            this.ctx.fill();
+
+            // Layer 3: Midground Basalt Ridge with Magma Glow (สันหินบะซอลต์)
+            this.ctx.fillStyle = '#2d0f09';
+            this.ctx.strokeStyle = '#dc2626';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, h);
+            for (let x = 0; x <= w; x += 25) {
+                const worldX = x + p3;
+                const y = h - 85 - Math.sin(worldX * 0.015) * 35;
                 this.ctx.lineTo(x, y);
             }
             this.ctx.lineTo(w, h);
@@ -2007,21 +2078,46 @@ class PlatformerGame {
             this.ctx.stroke();
 
         } else if (this.currentTheme === 'yoyle') {
+            // Layer 1: Cosmic Sky
             const yoyleGrad = this.ctx.createLinearGradient(0, 0, 0, h);
-            yoyleGrad.addColorStop(0, '#3b0764');
-            yoyleGrad.addColorStop(0.6, '#581c87');
-            yoyleGrad.addColorStop(1, '#7e22ce');
+            yoyleGrad.addColorStop(0, '#2e1065');
+            yoyleGrad.addColorStop(0.6, '#4c1d95');
+            yoyleGrad.addColorStop(1, '#6b21a8');
             this.ctx.fillStyle = yoyleGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            this.ctx.fillStyle = '#2e1065';
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 3;
+            // Sparkling Starfield
+            this.ctx.fillStyle = '#ffffff';
+            for (let s = 0; s < 18; s++) {
+                const starX = (s * 48 - (p1 * 0.6)) % w;
+                const starY = 25 + (s * 27) % 110;
+                const blink = Math.sin(time * 3 + s) * 0.4 + 0.6;
+                this.ctx.globalAlpha = Math.max(0, blink);
+                this.ctx.fillRect((starX + w) % w, starY, 2, 2);
+            }
+            this.ctx.globalAlpha = 1.0;
+
+            // Layer 2: Distant Monolithic Pillars
+            this.ctx.fillStyle = '#3b0764';
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, h);
+            for (let x = 0; x <= w + 40; x += 40) {
+                const worldX = x + p2;
+                const y = h - 145 - Math.cos(worldX * 0.011) * 55;
+                this.ctx.lineTo(x, y);
+            }
+            this.ctx.lineTo(w, h);
+            this.ctx.fill();
+
+            // Layer 3: Midground Crystal Ridges
+            this.ctx.fillStyle = '#4a044e';
+            this.ctx.strokeStyle = '#c084fc';
+            this.ctx.lineWidth = 2.5;
             this.ctx.beginPath();
             this.ctx.moveTo(0, h);
             for (let x = 0; x <= w; x += 30) {
-                const worldX = x + parallaxX;
-                const y = h - 120 - Math.cos(worldX * 0.012) * 45;
+                const worldX = x + p3;
+                const y = h - 95 - Math.sin(worldX * 0.018) * 35;
                 this.ctx.lineTo(x, y);
             }
             this.ctx.lineTo(w, h);
@@ -2029,46 +2125,118 @@ class PlatformerGame {
             this.ctx.stroke();
 
         } else {
+            // Grass Theme - Layer 1: Sky Gradient & Sun
             const skyGrad = this.ctx.createLinearGradient(0, 0, 0, h);
             skyGrad.addColorStop(0, '#38bdf8');
-            skyGrad.addColorStop(0.7, '#7dd3fc');
+            skyGrad.addColorStop(0.65, '#7dd3fc');
             skyGrad.addColorStop(1, '#bae6fd');
             this.ctx.fillStyle = skyGrad;
             this.ctx.fillRect(0, 0, w, h);
 
-            this.ctx.fillStyle = '#4ade80';
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 4;
+            // Sun with Rays
+            const sunX = (w * 0.82 - p1) % (w + 80);
+            this.ctx.fillStyle = '#fef08a';
+            this.ctx.beginPath();
+            this.ctx.arc(sunX, 60, 26, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Layer 1 Clouds
+            const clouds = [
+                { x: (w * 0.15 + time * 12 - p1) % (w + 220) - 100, y: 55, scale: 0.85 },
+                { x: (w * 0.55 + time * 8 - p1) % (w + 220) - 100, y: 88, scale: 1.1 },
+                { x: (w * 0.88 + time * 16 - p1) % (w + 220) - 100, y: 110, scale: 0.75 }
+            ];
+            clouds.forEach(c => {
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.beginPath();
+                this.ctx.arc(c.x, c.y, 20 * c.scale, 0, Math.PI * 2);
+                this.ctx.arc(c.x + 16 * c.scale, c.y - 10 * c.scale, 16 * c.scale, 0, Math.PI * 2);
+                this.ctx.arc(c.x + 32 * c.scale, c.y, 18 * c.scale, 0, Math.PI * 2);
+                this.ctx.fill();
+            });
+
+            // Layer 2: Distant Mountains (สันเขาหมอกสีฟ้าไกล)
+            this.ctx.fillStyle = '#78a1c9';
+            this.ctx.beginPath();
+            this.ctx.moveTo(-20, h);
+            for (let x = -20; x <= w + 20; x += 35) {
+                const worldX = x + p2;
+                const y = h - 135 - Math.sin(worldX * 0.007) * 45;
+                this.ctx.lineTo(x, y);
+            }
+            this.ctx.lineTo(w + 20, h);
+            this.ctx.fill();
+
+            // Layer 3: Midground Rolling Green Hills (เนินเขาเขียวชอุ่ม)
+            this.ctx.fillStyle = '#22c55e';
+            this.ctx.strokeStyle = '#15803d';
+            this.ctx.lineWidth = 3;
             this.ctx.beginPath();
             this.ctx.moveTo(-20, h);
             for (let x = -20; x <= w + 20; x += 25) {
-                const worldX = x + parallaxX;
-                const y = h - 90 - Math.sin(worldX * 0.008) * 30 - Math.cos(worldX * 0.015) * 15;
+                const worldX = x + p3;
+                const y = h - 85 - Math.sin(worldX * 0.012) * 28 - Math.cos(worldX * 0.02) * 14;
                 this.ctx.lineTo(x, y);
             }
             this.ctx.lineTo(w + 20, h);
             this.ctx.fill();
             this.ctx.stroke();
+        }
+    }
 
-            const clouds = [
-                { x: (w * 0.1 + time * 12 - parallaxX) % (w + 200) - 100, y: 60, scale: 0.9 },
-                { x: (w * 0.5 + time * 8 - parallaxX) % (w + 220) - 110, y: 100, scale: 1.15 },
-                { x: (w * 0.8 + time * 16 - parallaxX) % (w + 180) - 90, y: 125, scale: 0.8 }
-            ];
+    // วาดพร็อพตกแต่งธรรมชาติบนแพลตฟอร์ม
+    drawPlatformProps(plat) {
+        if (!plat.props || plat.props.length === 0) return;
 
-            clouds.forEach(c => {
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.strokeStyle = '#000000';
-                this.ctx.lineWidth = 3;
+        plat.props.forEach(prop => {
+            const px = plat.x + prop.relX;
+            const py = plat.y;
+
+            this.ctx.save();
+            if (prop.kind === 'grass_flower') {
+                this.ctx.fillStyle = '#f43f5e';
                 this.ctx.beginPath();
-                this.ctx.arc(c.x, c.y, 20 * c.scale, 0, Math.PI * 2);
-                this.ctx.arc(c.x + 16 * c.scale, c.y - 12 * c.scale, 16 * c.scale, 0, Math.PI * 2);
-                this.ctx.arc(c.x + 32 * c.scale, c.y, 18 * c.scale, 0, Math.PI * 2);
+                this.ctx.arc(px, py - 5, 3.5, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.fillStyle = '#facc15';
+                this.ctx.beginPath();
+                this.ctx.arc(px, py - 5, 1.5, 0, Math.PI * 2);
+                this.ctx.fill();
+            } else if (prop.kind === 'grass_tuft') {
+                this.ctx.fillStyle = '#16a34a';
+                this.ctx.beginPath();
+                this.ctx.moveTo(px - 3, py);
+                this.ctx.lineTo(px, py - 6);
+                this.ctx.lineTo(px + 3, py);
+                this.ctx.fill();
+            } else if (prop.kind === 'glow_mushroom') {
+                // ดอกเห็ดเรืองแสงสีฟ้าในถ้ำ
+                this.ctx.fillStyle = '#38bdf8';
+                this.ctx.beginPath();
+                this.ctx.arc(px, py - 6, 4.5, Math.PI, 0);
+                this.ctx.fill();
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(px - 1, py - 6, 2, 6);
+            } else if (prop.kind === 'crystal_shard') {
+                this.ctx.fillStyle = '#c084fc';
+                this.ctx.beginPath();
+                this.ctx.moveTo(px - 3, py);
+                this.ctx.lineTo(px, py - 8);
+                this.ctx.lineTo(px + 3, py);
                 this.ctx.closePath();
                 this.ctx.fill();
-                this.ctx.stroke();
-            });
-        }
+            } else if (prop.kind === 'magma_rock') {
+                this.ctx.fillStyle = '#ef4444';
+                this.ctx.fillRect(px - 2, py - 3, 5, 3);
+            } else {
+                // Pebble
+                this.ctx.fillStyle = '#64748b';
+                this.ctx.beginPath();
+                this.ctx.ellipse(px, py - 2, 3.5, 2, 0, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+            this.ctx.restore();
+        });
     }
 
     drawFireStarPlayer(p) {
@@ -2094,6 +2262,7 @@ class PlatformerGame {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // 1. Dynamic Parallax Background
         this.drawDynamicBackground();
 
         if (this.isGameCleared) {
@@ -2230,7 +2399,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // แพลตฟอร์ม Platforms
+        // แพลตฟอร์ม Platforms พร้อม Textured Surface & Props
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
             if (plat.type === 'phase' && !plat.active) return;
@@ -2265,16 +2434,48 @@ class PlatformerGame {
                 topColor = plat.type === 'crumble' ? '#c084fc' : '#a855f7';
             }
 
+            // ตัวบล็อกหลัก
             this.ctx.fillStyle = bodyColor;
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 3.5;
             this.ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
             this.ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
 
+            // ขอบผิวด้านบน
             this.ctx.fillStyle = topColor;
             this.ctx.fillRect(plat.x + 2, plat.y + 2, plat.width - 4, 8);
 
+            // รายละเอียดพื้นผิวฟันปลา/ยอดหญ้าตามขอบบน (Textured Trim)
+            if (this.currentTheme === 'grass' && plat.type === 'normal') {
+                this.ctx.fillStyle = '#16a34a';
+                for (let gx = plat.x + 4; gx < plat.x + plat.width - 6; gx += 8) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(gx, plat.y + 2);
+                    this.ctx.lineTo(gx + 3, plat.y - 3);
+                    this.ctx.lineTo(gx + 6, plat.y + 2);
+                    this.ctx.fill();
+                }
+            }
+
+            // ขอบหินย้อยเล็กๆ ใต้แพลตฟอร์ม (Underside Stalactites)
+            if (this.currentTheme === 'darkcave' || this.currentTheme === 'volcano') {
+                this.ctx.fillStyle = bodyColor;
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 1.5;
+                for (let ux = plat.x + 18; ux < plat.x + plat.width - 20; ux += 32) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(ux - 4, plat.y + plat.height);
+                    this.ctx.lineTo(ux, plat.y + plat.height + 6);
+                    this.ctx.lineTo(ux + 4, plat.y + plat.height);
+                    this.ctx.fill();
+                    this.ctx.stroke();
+                }
+            }
+
             this.ctx.restore();
+
+            // วาดพร็อพธรรมชาติบนพื้น
+            this.drawPlatformProps(plat);
         });
 
         // แผ่นเร่งความเร็ว (Speed Booster Pads)
