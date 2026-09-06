@@ -30,7 +30,7 @@ export class UIManager {
         ];
     }
 
-    init(onTabChange, onRestart, onResetData) {
+    init(onTabChange, onRestart, onResetData, onRetryLevel) {
         store.subscribe((state) => this.render(state));
         
         // Navigation Bar Listeners
@@ -42,10 +42,27 @@ export class UIManager {
             });
         });
 
-        // Action Button Listeners
-        document.getElementById('btn-restart').addEventListener('click', () => {
-            if (onRestart) onRestart();
-        });
+        // Game Over Listeners: เลือกระหว่างเริ่มด่านนี้ใหม่ หรือ เริ่มใหม่ทั้งหมด
+        const btnRetryLevel = document.getElementById('btn-retry-level');
+        if (btnRetryLevel) {
+            btnRetryLevel.addEventListener('click', () => {
+                if (onRetryLevel) onRetryLevel();
+            });
+        }
+
+        const btnRestartAll = document.getElementById('btn-restart-all');
+        if (btnRestartAll) {
+            btnRestartAll.addEventListener('click', () => {
+                if (onRestart) onRestart();
+            });
+        }
+
+        const oldBtnRestart = document.getElementById('btn-restart');
+        if (oldBtnRestart) {
+            oldBtnRestart.addEventListener('click', () => {
+                if (onRestart) onRestart();
+            });
+        }
 
         document.getElementById('btn-reset-data').addEventListener('click', () => {
             if (confirm('คุณต้องการรีเซ็ตข้อมูลสถิติทั้งหมดใช่หรือไม่?')) {

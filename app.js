@@ -231,7 +231,8 @@ class PlatformerGame {
         this.ui.init(
             (tab) => this.handleTabChange(tab),
             () => this.restartGame(),
-            () => this.restartGame()
+            () => this.restartGame(),
+            () => this.retryCurrentLevel()
         );
 
         this.setupTouchControls();
@@ -1036,6 +1037,19 @@ class PlatformerGame {
         this.updateBGMState();
     }
 
+    // เริ่มด่านปัจจุบันใหม่เมื่อ Game Over
+    retryCurrentLevel() {
+        if (this.pauseOverlay) this.pauseOverlay.classList.add('hidden');
+        this.isPaused = false;
+        store.retryLevel();
+        this.resetEntities();
+        this.currentBgmIndex = 0;
+        this.bgm.src = this.bgmTracks[this.currentBgmIndex];
+        this.bgm.currentTime = 0;
+        this.updateBGMState();
+    }
+
+    // รีเซ็ตเกมใหม่ทั้งหมดกลับไปเริ่มที่ด่าน 1
     restartGame() {
         if (this.pauseOverlay) this.pauseOverlay.classList.add('hidden');
         this.isPaused = false;

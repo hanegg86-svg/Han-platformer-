@@ -11,7 +11,7 @@
 
     <title>Platformer Pro - Auto-Run Fireball Action</title>
     <!-- อัปเดต Version Query String ตัดแคช CSS -->
-    <link rel="stylesheet" href="styles.css?v=19">
+    <link rel="stylesheet" href="styles.css?v=20">
     
     <!-- App Icon Config -->
     <meta name="theme-color" content="#0f172a">
@@ -51,24 +51,25 @@
                         </div>
                     </div>
 
-                    <!-- Game Over Overlay Modal -->
+                    <!-- Game Over Overlay Modal: ตัวเลือกระหว่างเริ่มด่านเดิม หรือเริ่มใหม่หมด -->
                     <div id="game-over-overlay" class="overlay hidden">
                         <div class="modal-card">
                             <h2>Game Over!</h2>
                             <p>คะแนนที่คุณทำได้: <span id="final-score">0</span></p>
-                            <button id="btn-restart" class="btn btn-primary">เล่นใหม่อีกครั้ง</button>
+                            <button id="btn-retry-level" class="btn btn-primary" style="margin-bottom: 12px;">🔄 เริ่มด่านนี้ใหม่</button>
+                            <button id="btn-restart-all" class="btn btn-danger">⏮️ เริ่มใหม่ทั้งหมด (ด่าน 1)</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Touch Controller Overlay (เฉพาะ ยิงลูกไฟ / หยุดวิ่ง / พุ่ง / กระโดด) -->
+                <!-- Touch Controller Overlay: ซ้าย (หยุด + พุ่ง) / ขวา (ยิงไฟ + กระโดด) -->
                 <div class="touch-controls">
                     <div class="left-controls">
                         <button id="btn-stop" class="touch-btn btn-stop" title="หยุดวิ่ง">🛑 หยุด</button>
-                        <button id="btn-fire" class="touch-btn btn-fire">🔥 ยิงไฟ</button>
+                        <button id="btn-dash" class="touch-btn btn-dash">⚡ พุ่ง</button>
                     </div>
                     <div class="action-btns">
-                        <button id="btn-dash" class="touch-btn btn-dash">⚡ พุ่ง</button>
+                        <button id="btn-fire" class="touch-btn btn-fire">🔥 ยิงไฟ</button>
                         <button id="btn-jump" class="touch-btn btn-action">กระโดด</button>
                     </div>
                 </div>
@@ -148,6 +149,6 @@
     </div>
 
     <!-- อัปเดต Version Query String ตัดแคช JS -->
-    <script type="module" src="app.js?v=19"></script>
+    <script type="module" src="app.js?v=20"></script>
 </body>
 </html>

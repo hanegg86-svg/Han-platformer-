@@ -104,6 +104,11 @@ class Store {
         this.notify();
     }
 
+    retryLevel() {
+        this.state.isGameOver = false;
+        this.notify();
+    }
+
     resetScore() {
         this.state.score = 0;
         this.state.level = 1;
