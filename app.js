@@ -182,11 +182,14 @@ class PlatformerGame {
         this.lava = null;
         this.goal = null;
 
-        // Puzzle Entities
+        // Puzzle & Dynamic Entities
         this.crates = [];
         this.switches = [];
         this.doors = [];
         this.vines = [];
+        this.speedPads = [];
+        this.geysers = [];
+        this.stalactites = [];
 
         // Camera System
         this.cameraX = 0;
@@ -341,6 +344,9 @@ class PlatformerGame {
         const doors = [];
         const vines = [];
         const checkpoints = [];
+        const speedPads = [];
+        const geysers = [];
+        const stalactites = [];
         let boss = null;
 
         let currX = 0;
@@ -355,6 +361,24 @@ class PlatformerGame {
             const seed = Math.abs(Math.sin(level * 14.123 + platformId * 78.233));
             
             const gapWidth = Math.min(95, 45 + Math.floor(seed * 35) + Math.min(level, 10));
+
+            // เสาลาวาปะทุตามช่องว่างเหว (Geysers)
+            if (gapWidth >= 55 && (theme === 'volcano' || (level >= 3 && seed > 0.65))) {
+                const geyserX = currX + (gapWidth - 32) / 2;
+                const geyserH = Math.min(220, h - 110);
+                geysers.push({
+                    x: geyserX,
+                    y: h - geyserH,
+                    width: 32,
+                    height: geyserH,
+                    timer: Math.floor(seed * 160),
+                    period: 170,
+                    warnTime: 50,
+                    eruptTime: 95,
+                    state: 'idle'
+                });
+            }
+
             currX += gapWidth;
 
             const platWidth = Math.max(130, 220 - level * 1.5 + Math.floor(seed * 60));
@@ -391,6 +415,84 @@ class PlatformerGame {
             }
 
             platforms.push(platObj);
+
+            // ทางแยกวัดใจ 2 ระดับ (Branching Paths: Upper Path)
+            if (platformId % 5 === 0 && platWidth >= 160 && currX < levelWidth - 700) {
+                const upperWidth = Math.max(120, platWidth * 0.85);
+                const upperY = platY - 95;
+                platforms.push({
+                    x: currX + 20,
+                    y: upperY,
+                    width: upperWidth,
+                    height: 26,
+                    type: 'normal',
+                    isUpperPath: true
+                });
+
+                // เหรียญทองก้อนโต 3 เหรียญบนทางแยกชั้นบน
+                for (let ci = 0; ci < 3; ci++) {
+                    coins.push({
+                        x: currX + 40 + ci * 28,
+                        y: upperY - 24,
+                        radius: 9,
+                        collected: false
+                    });
+                }
+
+                // สปริงช่วยดีดขึ้นสู่ทางแยกชั้นบน
+                springs.push({
+                    x: currX + 15,
+                    y: platY - 10,
+                    width: 24,
+                    height: 10
+                });
+
+                // ศัตรูลอยฟ้าเฝ้าทางแยกชั้นบน
+                enemies.push({
+                    x: currX + 30,
+                    y: upperY - 55,
+                    baseY: upperY - 55,
+                    width: 32,
+                    height: 32,
+                    vx: 0,
+                    minX: currX + 20,
+                    maxX: currX + 20 + upperWidth - 32,
+                    isFlying: true,
+                    isArmored: false,
+                    isRanged: false,
+                    flyTimer: platformId,
+                    shootTimer: 0,
+                    isFrozen: false,
+                    freezeTimer: 0,
+                    isDefeated: false
+                });
+            }
+
+            // แผ่นเร่งความเร็ว (Speed Booster Pads)
+            if (seed < 0.28 && platWidth >= 170 && pType === 'normal') {
+                speedPads.push({
+                    x: currX + 35,
+                    y: platY - 6,
+                    width: 44,
+                    height: 6
+                });
+            }
+
+            // หินย้อยถล่มจากเพดาน (Falling Stalactites)
+            if (platformId % 4 === 0 && seed > 0.35 && currX < levelWidth - 500) {
+                stalactites.push({
+                    x: currX + platWidth * 0.45,
+                    y: 15,
+                    startY: 15,
+                    width: 24,
+                    height: 38,
+                    vy: 0,
+                    isTriggered: false,
+                    shakeTimer: 0,
+                    isFalling: false,
+                    isDestroyed: false
+                });
+            }
 
             if (seed > 0.82 && platWidth >= 160 && pType === 'normal') {
                 springs.push({
@@ -551,7 +653,10 @@ class PlatformerGame {
             crates,
             switches,
             doors,
-            vines
+            vines,
+            speedPads,
+            geysers,
+            stalactites
         };
     }
 
@@ -664,6 +769,9 @@ class PlatformerGame {
         this.switches = levelData.switches || [];
         this.doors = levelData.doors || [];
         this.vines = levelData.vines || [];
+        this.speedPads = levelData.speedPads || [];
+        this.geysers = levelData.geysers || [];
+        this.stalactites = levelData.stalactites || [];
 
         this.lava = {
             x: -250,
@@ -979,7 +1087,7 @@ class PlatformerGame {
         if (p.boostTimer > 0) p.boostTimer--;
         if (p.magnetTimer > 0) p.magnetTimer--;
 
-        const currentSpeed = p.boostTimer > 0 ? p.speed * 1.5 : p.speed;
+        const currentSpeed = p.boostTimer > 0 ? p.speed * 1.65 : p.speed;
 
         if (p.isGroundPounding) {
             p.vx = 0;
@@ -1005,7 +1113,7 @@ class PlatformerGame {
                 x: p.x + p.width / 2,
                 y: p.y + p.height / 2,
                 alpha: 0.6,
-                color: '#f97316'
+                color: p.boostTimer > 0 ? '#38bdf8' : '#f97316'
             });
         }
         p.trail.forEach(t => t.alpha -= 0.05);
@@ -1139,6 +1247,137 @@ class PlatformerGame {
             }
         });
 
+        // Speed Booster Pads Interaction
+        this.speedPads.forEach(pad => {
+            if (
+                p.x < pad.x + pad.width &&
+                p.x + p.width > pad.x &&
+                p.y + p.height >= pad.y - 4 &&
+                p.y + p.height <= pad.y + pad.height + 8 &&
+                p.vy >= 0
+            ) {
+                if (p.boostTimer < 75) {
+                    p.boostTimer = 90;
+                    this.sfx.playSpring();
+                    this.triggerShake(4, 6);
+                    this.addParticles(p.x + p.width / 2, pad.y, '#38bdf8', 14);
+                    this.addFloatingText(pad.x - 10, pad.y - 18, '⚡ HYPER SPEED!', '#38bdf8');
+                }
+            }
+        });
+
+        // Lava Geysers Interaction (อุปสรรคเสาลาวาปะทุ)
+        this.geysers.forEach(g => {
+            g.timer = (g.timer + 1) % g.period;
+            if (g.timer < g.warnTime) {
+                g.state = 'idle';
+            } else if (g.timer < g.eruptTime) {
+                g.state = 'warn';
+                if (Math.random() < 0.3) {
+                    this.particles.push({
+                        x: g.x + Math.random() * g.width,
+                        y: this.canvas.height - 10,
+                        vx: (Math.random() - 0.5) * 1.5,
+                        vy: -Math.random() * 3 - 1,
+                        size: Math.random() * 3 + 1.5,
+                        color: '#ef4444',
+                        alpha: 0.8,
+                        life: 18
+                    });
+                }
+            } else {
+                g.state = 'erupt';
+                if (Math.random() < 0.4) {
+                    this.particles.push({
+                        x: g.x + Math.random() * g.width,
+                        y: g.y + Math.random() * g.height,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: -Math.random() * 4 - 2,
+                        size: Math.random() * 4 + 2,
+                        color: '#f97316',
+                        alpha: 0.9,
+                        life: 15
+                    });
+                }
+
+                if (
+                    p.x < g.x + g.width &&
+                    p.x + p.width > g.x &&
+                    p.y < g.y + g.height &&
+                    p.y + p.height > g.y
+                ) {
+                    this.handlePlayerDamage();
+                }
+            }
+        });
+
+        // Falling Stalactites (หินย้อยถล่มจากเพดาน)
+        this.stalactites.forEach(st => {
+            if (st.isDestroyed) return;
+
+            if (!st.isTriggered && Math.abs((p.x + p.width / 2) - (st.x + st.width / 2)) < 130 && p.x < st.x + st.width + 40) {
+                st.isTriggered = true;
+                st.shakeTimer = 20;
+            }
+
+            if (st.shakeTimer > 0) {
+                st.shakeTimer--;
+                if (Math.random() < 0.45) {
+                    this.particles.push({
+                        x: st.x + Math.random() * st.width,
+                        y: st.y + st.height,
+                        vx: (Math.random() - 0.5) * 1.2,
+                        vy: Math.random() * 2 + 1,
+                        size: 2,
+                        color: '#78716c',
+                        alpha: 0.8,
+                        life: 12
+                    });
+                }
+                if (st.shakeTimer <= 0) {
+                    st.isFalling = true;
+                }
+            }
+
+            if (st.isFalling) {
+                st.vy += 0.52;
+                st.y += st.vy;
+
+                // ชนพื้นแล้วแตก
+                for (let i = 0; i < this.platforms.length; i++) {
+                    const plat = this.platforms[i];
+                    if (plat.isDestroyed) continue;
+                    if (
+                        st.x < plat.x + plat.width &&
+                        st.x + st.width > plat.x &&
+                        st.y + st.height >= plat.y &&
+                        st.y <= plat.y + plat.height
+                    ) {
+                        st.isDestroyed = true;
+                        this.addParticles(st.x + st.width / 2, plat.y, '#78716c', 12);
+                        break;
+                    }
+                }
+
+                if (st.y > this.canvas.height + 20) {
+                    st.isDestroyed = true;
+                }
+
+                // ชนตัวผู้เล่น
+                if (
+                    !st.isDestroyed &&
+                    p.x < st.x + st.width &&
+                    p.x + p.width > st.x &&
+                    p.y < st.y + st.height &&
+                    p.y + p.height > st.y
+                ) {
+                    st.isDestroyed = true;
+                    this.addParticles(st.x + st.width / 2, st.y + st.height / 2, '#78716c', 15);
+                    this.handlePlayerDamage();
+                }
+            }
+        });
+
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) {
                 if (plat.type === 'crumble') {
@@ -1186,6 +1425,16 @@ class PlatformerGame {
                             store.addScore(75);
                             p.mp = Math.min(p.maxMp, p.mp + 20);
                             this.addParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#a855f7', 15);
+                        }
+                    });
+
+                    // ทำลายหินย้อยที่อยู่ใกล้เคียง
+                    this.stalactites.forEach(st => {
+                        if (!st.isDestroyed && Math.abs((st.x + st.width / 2) - (p.x + p.width / 2)) < 140) {
+                            st.isDestroyed = true;
+                            store.addScore(40);
+                            this.addParticles(st.x + st.width / 2, st.y + st.height / 2, '#78716c', 16);
+                            this.addFloatingText(st.x, st.y - 10, '💥 หินพัง! +40', '#facc15');
                         }
                     });
                 }
@@ -1380,7 +1629,7 @@ class PlatformerGame {
                 });
             }
 
-            // เผาเถาวัลย์
+            // ยิงเผาเถาวัลย์
             this.vines.forEach(vine => {
                 if (
                     !vine.isBurned &&
@@ -1396,7 +1645,7 @@ class PlatformerGame {
                 }
             });
 
-            // สวิตช์
+            // ยิงเปิดสวิตช์
             this.switches.forEach(sw => {
                 if (
                     sp.x > sw.x && sp.x < sw.x + sw.width &&
@@ -1407,6 +1656,24 @@ class PlatformerGame {
                     this.sfx.playCheckpoint();
                     this.addParticles(sw.x + sw.width / 2, sw.y, '#facc15', 14);
                     this.addFloatingText(sw.x, sw.y - 15, '🔥 สวิตช์ทำงาน!', '#facc15');
+                }
+            });
+
+            // ยิงทำลายหินย้อย
+            this.stalactites.forEach(st => {
+                if (st.isDestroyed) return;
+                if (
+                    sp.x > st.x - 10 && sp.x < st.x + st.width + 10 &&
+                    sp.y > st.y - 10 && sp.y < st.y + st.height + 10
+                ) {
+                    st.isDestroyed = true;
+                    sp.hit = true;
+                    store.addScore(40);
+                    p.mp = Math.min(p.maxMp, p.mp + 10);
+                    this.sfx.playHit();
+                    this.triggerShake(7, 10);
+                    this.addParticles(st.x + st.width / 2, st.y + st.height / 2, '#78716c', 18);
+                    this.addFloatingText(st.x - 15, st.y - 10, '💥 ยิงหินแตก! +40', '#facc15');
                 }
             });
 
@@ -1744,6 +2011,7 @@ class PlatformerGame {
 
         this.ctx.translate(-this.cameraX, 0);
 
+        // วาดอนุภาคเอฟเฟกต์
         this.particles.forEach(pt => {
             this.ctx.beginPath();
             this.ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
@@ -1755,6 +2023,7 @@ class PlatformerGame {
 
         const p = this.player;
 
+        // วาดเส้นแสงความเร็ว (Dash & Boost Trail)
         p.trail.forEach(t => {
             this.ctx.beginPath();
             this.ctx.arc(t.x, t.y, 12 * t.alpha, 0, Math.PI * 2);
@@ -1764,6 +2033,7 @@ class PlatformerGame {
             this.ctx.globalAlpha = 1.0;
         });
 
+        // จุดเซฟ Checkpoints
         this.checkpoints.forEach(cp => {
             this.ctx.fillStyle = cp.active ? '#22c55e' : '#38bdf8';
             this.ctx.strokeStyle = '#000000';
@@ -1780,6 +2050,52 @@ class PlatformerGame {
             this.ctx.stroke();
         });
 
+        // เสาลาวาปะทุ (Lava Geysers)
+        this.geysers.forEach(g => {
+            this.ctx.save();
+            if (g.state === 'warn') {
+                this.ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+                this.ctx.fillRect(g.x, g.y, g.width, g.height);
+
+                this.ctx.fillStyle = '#ef4444';
+                this.ctx.font = 'bold 16px sans-serif';
+                this.ctx.textAlign = 'center';
+                const blink = Math.floor(this.levelTime / 6) % 2 === 0;
+                if (blink) {
+                    this.ctx.fillText('⚠️', g.x + g.width / 2, g.y + 30);
+                }
+            } else if (g.state === 'erupt') {
+                const grad = this.ctx.createLinearGradient(g.x, g.y + g.height, g.x, g.y);
+                grad.addColorStop(0, '#dc2626');
+                grad.addColorStop(0.5, '#f97316');
+                grad.addColorStop(1, '#facc15');
+
+                this.ctx.fillStyle = grad;
+                this.ctx.strokeStyle = '#ef4444';
+                this.ctx.lineWidth = 2.5;
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(g.x, g.y + g.height);
+                for (let gy = g.y + g.height; gy >= g.y; gy -= 15) {
+                    const wave = Math.sin((gy + this.levelTime * 6) * 0.08) * 4;
+                    this.ctx.lineTo(g.x + wave, gy);
+                }
+                this.ctx.lineTo(g.x + g.width / 2, g.y - 10);
+                for (let gy = g.y; gy <= g.y + g.height; gy += 15) {
+                    const wave = Math.sin((gy + this.levelTime * 6) * 0.08) * 4;
+                    this.ctx.lineTo(g.x + g.width + wave, gy);
+                }
+                this.ctx.closePath();
+                this.ctx.fill();
+                this.ctx.stroke();
+
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                this.ctx.fillRect(g.x + g.width * 0.3, g.y + 10, g.width * 0.4, g.height - 10);
+            }
+            this.ctx.restore();
+        });
+
+        // กำแพงลาวาไล่หลัง
         if (this.lava) {
             this.ctx.save();
             this.ctx.fillStyle = '#ef4444';
@@ -1800,6 +2116,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
+        // เส้นชัย Goal
         if (this.goal) {
             this.ctx.save();
             const isLocked = this.goal.isLocked;
@@ -1826,6 +2143,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
+        // แพลตฟอร์ม Platforms
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
             if (plat.type === 'phase' && !plat.active) return;
@@ -1834,7 +2152,10 @@ class PlatformerGame {
             let bodyColor = '#1e293b';
             let topColor = '#22c55e';
 
-            if (plat.type === 'bounce') {
+            if (plat.isUpperPath) {
+                bodyColor = '#1e1b4b';
+                topColor = '#818cf8';
+            } else if (plat.type === 'bounce') {
                 bodyColor = '#7e22ce';
                 topColor = '#f472b6';
             } else if (plat.type === 'ice') {
@@ -1866,6 +2187,60 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
+        // แผ่นเร่งความเร็ว (Speed Booster Pads)
+        this.speedPads.forEach(pad => {
+            this.ctx.save();
+            this.ctx.fillStyle = '#0f172a';
+            this.ctx.strokeStyle = '#38bdf8';
+            this.ctx.lineWidth = 2;
+            this.ctx.fillRect(pad.x, pad.y, pad.width, pad.height);
+            this.ctx.strokeRect(pad.x, pad.y, pad.width, pad.height);
+
+            this.ctx.fillStyle = '#38bdf8';
+            const shift = (this.levelTime * 2.2) % 14;
+            for (let ax = pad.x + 6 + (shift % 14); ax < pad.x + pad.width - 6; ax += 14) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(ax, pad.y + 1);
+                this.ctx.lineTo(ax + 5, pad.y + pad.height / 2);
+                this.ctx.lineTo(ax, pad.y + pad.height - 1);
+                this.ctx.fill();
+            }
+            this.ctx.restore();
+        });
+
+        // หินย้อยถล่ม (Falling Stalactites)
+        this.stalactites.forEach(st => {
+            if (st.isDestroyed) return;
+            this.ctx.save();
+            let drawX = st.x;
+            if (st.shakeTimer > 0) {
+                drawX += (Math.random() - 0.5) * 4;
+            }
+
+            this.ctx.fillStyle = '#64748b';
+            this.ctx.strokeStyle = '#0f172a';
+            this.ctx.lineWidth = 2.5;
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(drawX, st.y);
+            this.ctx.lineTo(drawX + st.width, st.y);
+            this.ctx.lineTo(drawX + st.width * 0.5, st.y + st.height);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.stroke();
+
+            this.ctx.fillStyle = '#94a3b8';
+            this.ctx.beginPath();
+            this.ctx.moveTo(drawX + 3, st.y + 2);
+            this.ctx.lineTo(drawX + st.width * 0.5, st.y + 2);
+            this.ctx.lineTo(drawX + st.width * 0.5, st.y + st.height - 4);
+            this.ctx.closePath();
+            this.ctx.fill();
+
+            this.ctx.restore();
+        });
+
+        // สปริง Springs
         this.springs.forEach(spg => {
             this.ctx.save();
             this.ctx.fillStyle = '#38bdf8';
@@ -1879,6 +2254,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
+        // สวิตช์ Switches
         this.switches.forEach(sw => {
             this.ctx.save();
             this.ctx.fillStyle = sw.isPressed ? '#22c55e' : '#ef4444';
@@ -1891,6 +2267,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
+        // ประตู Doors
         this.doors.forEach(door => {
             if (!door.isOpen) {
                 this.ctx.save();
@@ -1913,6 +2290,7 @@ class PlatformerGame {
             }
         });
 
+        // กล่อง Crates
         this.crates.forEach(crate => {
             this.ctx.save();
             this.ctx.fillStyle = '#b45309';
@@ -1927,6 +2305,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
+        // เถาวัลย์ Vines
         this.vines.forEach(vine => {
             if (!vine.isBurned) {
                 this.ctx.save();
@@ -1946,6 +2325,7 @@ class PlatformerGame {
             }
         });
 
+        // หนาม Spikes
         this.spikes.forEach(spike => {
             this.ctx.save();
             this.ctx.fillStyle = '#ef4444';
@@ -1967,7 +2347,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // บอส
+        // บอส Boss
         if (this.boss && !this.boss.isDefeated) {
             const b = this.boss;
             this.ctx.save();
@@ -2016,7 +2396,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // ศัตรู
+        // ศัตรู Enemies
         this.enemies.forEach(e => {
             if (e.isDefeated) return;
             this.ctx.save();
@@ -2055,7 +2435,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // เรนเดอร์ลูกไฟ (ขนาดตามเลเวล)
+        // ลูกไฟเวท Spells
         this.spells.forEach(sp => {
             this.ctx.save();
             this.ctx.beginPath();
@@ -2066,7 +2446,6 @@ class PlatformerGame {
             this.ctx.fill();
             this.ctx.stroke();
 
-            // แกนกลางสีสว่าง
             this.ctx.beginPath();
             this.ctx.arc(sp.x - sp.vx * 0.4, sp.y, sp.radius * 0.55, 0, Math.PI * 2);
             this.ctx.fillStyle = '#ffffff';
@@ -2074,7 +2453,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // Projectiles
+        // กระสุน Projectiles
         this.projectiles.forEach(pj => {
             this.ctx.save();
             this.ctx.beginPath();
@@ -2087,7 +2466,7 @@ class PlatformerGame {
             this.ctx.restore();
         });
 
-        // Powerups
+        // ไอเทม Powerups
         this.powerups.forEach(pw => {
             if (!pw.collected) {
                 this.ctx.save();
@@ -2106,7 +2485,7 @@ class PlatformerGame {
             }
         });
 
-        // เหรียญ
+        // เหรียญ Coins
         this.coins.forEach(coin => {
             if (!coin.collected) {
                 const spinScale = Math.abs(Math.sin(this.levelTime * 0.08));
@@ -2126,7 +2505,7 @@ class PlatformerGame {
             }
         });
 
-        // ตัวละคร
+        // ตัวละคร Player
         if (p.invincibleTimer > 0 && Math.floor(p.invincibleTimer / 4) % 2 === 0) {
             // Invincible Flashing
         } else {
@@ -2153,6 +2532,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
+        // ข้อความลอย Floating Texts
         this.floatingTexts.forEach(ft => {
             this.ctx.font = 'bold 15px sans-serif';
             this.ctx.fillStyle = ft.color;
