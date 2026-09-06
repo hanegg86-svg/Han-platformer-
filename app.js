@@ -407,7 +407,6 @@ class PlatformerGame {
 
         const targetTime = Math.max(60, 95 - Math.floor((level - 1) / 2));
 
-        // เอา 'bounce' ออกจาก allowedTypes เพื่อตัดพื้นกระเด้งที่คุมยากออก
         const allowedTypes = ['normal'];
         if (level >= 5) allowedTypes.push('ice');
         if (level >= 8) allowedTypes.push('crumble');
@@ -743,7 +742,6 @@ class PlatformerGame {
             isLocked: isBossLevel
         };
 
-        // ตั้งจุดทริกเกอร์หินยักษ์ถล่ม (Rolling Boulder) ตั้งแต่ด่าน 3 ขึ้นไป
         const boulderTriggerX = (level >= 3 && !isBossLevel) ? levelWidth * 0.42 : null;
 
         return {
@@ -888,7 +886,6 @@ class PlatformerGame {
         this.geysers = levelData.geysers || [];
         this.stalactites = levelData.stalactites || [];
 
-        // มินิอีเวนต์หินยักษ์ถล่ม
         this.boulder = (levelData.boulderTriggerX) ? {
             triggerX: levelData.boulderTriggerX,
             triggered: false,
@@ -1044,7 +1041,7 @@ class PlatformerGame {
         if (!p || p.magicCooldown > 0) return;
 
         const isFever = p.isFever;
-        const cost = isFever ? 0 : 20; // Fever Mode ยิงฟรีไม่เสีย MP
+        const cost = isFever ? 0 : 20;
 
         if (p.mp < cost) {
             this.addFloatingText(p.x, p.y - 20, '⚠️ MP ไม่พอ!', '#ef4444');
@@ -1180,7 +1177,7 @@ class PlatformerGame {
             }
         } else if (p.feverGauge >= p.maxFeverGauge) {
             p.isFever = true;
-            p.feverTimer = 420; // 7 วินาที
+            p.feverTimer = 420;
             this.sfx.playCheckpoint();
             this.triggerShake(12, 16);
             this.addFloatingText(p.x - 25, p.y - 25, '🔥 FEVER OVERHEAT! 🔥', '#facc15');
@@ -1266,14 +1263,15 @@ class PlatformerGame {
         let currentSpeed = p.boostTimer > 0 ? p.speed * 1.65 : p.speed;
         if (p.isFever) currentSpeed *= 1.25;
 
-        // ระบบหยุดวิ่ง (Hold-to-Brake)
-        const isBraking = (this.keys.stop || this.isStopping) && p.isGrounded && !p.isDashing;
+        // ระบบหยุดวิ่ง (Hold-to-Brake): ถ้ากดปุ่มหยุดค้างไว้ จะหยุดอยู่กับที่ (vx = 0) ทั้งบนพื้นและกลางอากาศ
+        const isStopPressed = (this.keys.stop || this.isStopping) && !p.isDashing;
 
-        if (isBraking) {
+        if (isStopPressed) {
             p.vx = 0;
             p.vy += this.GRAVITY;
 
-            if (Math.random() < 0.4) {
+            // เอฟเฟกต์สะเก็ดฝุ่นแสดงเฉพาะตอนที่กดหยุดอยู่บนพื้น
+            if (p.isGrounded && Math.random() < 0.4) {
                 this.particles.push({
                     x: p.x + 8,
                     y: p.y + p.height - 2,
@@ -1623,7 +1621,6 @@ class PlatformerGame {
             }
         });
 
-        // ตรวจจับการชนแพลตฟอร์ม (ตัดระบบ bounce ออก)
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) {
                 if (plat.type === 'crumble') {
@@ -1990,7 +1987,7 @@ class PlatformerGame {
                 pj.vx *= -1.8;
                 pj.vy *= -1.8;
                 pj.color = '#38bdf8';
-                this.addFever(25); // สะสม Fever เมื่อ Parry สำเร็จ
+                this.addFever(25);
                 this.sfx.playCheckpoint();
                 this.triggerShake(8, 10);
                 this.addParticles(pj.x, pj.y, '#38bdf8', 16);
@@ -2508,7 +2505,6 @@ class PlatformerGame {
 
             this.ctx.restore();
 
-            // หลอดเลือดหินยักษ์
             const barW = 50;
             const hpRatio = Math.max(0, bld.hp) / bld.maxHp;
             this.ctx.fillStyle = '#0f172a';
@@ -2543,7 +2539,7 @@ class PlatformerGame {
             this.ctx.restore();
         }
 
-        // แพลตฟอร์ม Platforms (ไม่มีประเภท bounce แล้ว)
+        // แพลตฟอร์ม Platforms
         this.platforms.forEach(plat => {
             if (plat.isDestroyed) return;
             if (plat.type === 'phase' && !plat.active) return;
@@ -2930,7 +2926,6 @@ class PlatformerGame {
             this.ctx.rotate(p.rotation);
             this.ctx.scale(p.scaleX, p.scaleY);
 
-            // ออร่าสีทองเรืองแสงรอบตัวเมื่อเข้าสู่ Fever Mode
             if (p.isFever) {
                 this.ctx.beginPath();
                 this.ctx.arc(0, -p.height / 2, p.height * 0.75 + Math.sin(this.levelTime * 0.3) * 3, 0, Math.PI * 2);
@@ -3084,7 +3079,7 @@ class PlatformerGame {
             this.ctx.fillText(`🔥 COMBO x${currentMult} (${this.comboCount})`, 12, feverY + 28);
         }
 
-        // ป้ายเตือนหินยักษ์ถล่ม (Danger Banner)
+        // ป้ายเตือนหินยักษ์ถล่ม
         if (this.boulder && this.boulder.warningTimer > 0) {
             this.ctx.fillStyle = 'rgba(220, 38, 38, 0.9)';
             this.ctx.fillRect(0, 75, this.canvas.width, 38);
