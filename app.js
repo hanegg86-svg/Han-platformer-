@@ -373,7 +373,8 @@ class PlatformerGame {
     addFever(amount) {
         const p = this.player;
         if (!p || p.isFever) return;
-        p.feverGauge = Math.min(p.maxFeverGauge, p.feverGauge + amount);
+        const feverMultiplier = 1 + (store.getState().upgrades?.feverLevel || 0) * 0.25;
+        p.feverGauge = Math.min(p.maxFeverGauge, p.feverGauge + amount * feverMultiplier);
     }
 
     updateBGMState() {
@@ -447,7 +448,6 @@ class PlatformerGame {
             platformId++;
             const seed = Math.abs(Math.sin(level * 14.123 + platformId * 78.233));
             
-            // ปรับระยะห่างระหว่างแท่นเหยียบให้แคบลง ข้ามง่าย ไม่ตกเหวง่าย
             const gapWidth = Math.min(70, 35 + Math.floor(seed * 25) + Math.min(level, 6));
 
             if (gapWidth >= 55 && (theme === 'volcano' || (level >= 4 && seed > 0.80))) {
@@ -468,7 +468,6 @@ class PlatformerGame {
 
             currX += gapWidth;
 
-            // เพิ่มความกว้างแท่นเหยียบให้ยืนง่ายขึ้น
             const platWidth = Math.max(180, 260 - level * 1.5 + Math.floor(seed * 60));
             
             let heightVariation = Math.sin(platformId * 0.85 + level * 0.5) * 55 + (seed - 0.5) * 35;
@@ -610,7 +609,6 @@ class PlatformerGame {
                 });
             }
 
-            // ลดความถี่การเกิดหนาม
             if (seed > 0.78 && platWidth >= 170 && pType === 'normal') {
                 const spikeW = Math.min(42, platWidth * 0.25);
                 spikes.push({
@@ -812,6 +810,8 @@ class PlatformerGame {
 
         const state = store.getState();
         const dashCooldownBase = Math.max(15, 30 - (state.upgrades?.dashLevel || 0) * 4);
+        const heartBonus = state.upgrades?.heartLevel || 0;
+        const mpBonus = state.upgrades?.mpLevel || 0;
 
         this.player = {
             x: this.spawnPoint.x,
@@ -820,17 +820,17 @@ class PlatformerGame {
             height: 42,
             vx: 0,
             vy: 0,
-            speed: 2.3, // ปรับความเร็ววิ่งลงเพื่อให้อ่านสถานการณ์ทัน
-            jumpPower: -7.2, // เพิ่มแรงกระโดดให้ข้ามสิ่งกีดขวางได้สบายขึ้น
+            speed: 2.3,
+            jumpPower: -7.2,
             isGrounded: false,
             
-            lives: 5, // เพิ่มชีวิตเริ่มต้นเป็น 5
-            maxLives: 5,
+            lives: 5 + heartBonus,
+            maxLives: 5 + heartBonus,
 
-            // MP System: ฟื้นฟูไวขึ้น
-            mp: 100,
-            maxMp: 100,
-            mpRegen: 0.75,
+            // MP System: คำนวณร่วมกับอัปเกรด MP Mastery
+            mp: 100 + mpBonus * 20,
+            maxMp: 100 + mpBonus * 20,
+            mpRegen: 0.75 + mpBonus * 0.15,
             magicCooldown: 0,
 
             // Fever Mode System
@@ -842,7 +842,7 @@ class PlatformerGame {
             // Bullet Time Tracker
             bulletTimeTimer: 0,
 
-            jumpsLeft: 2, // กระโดดกลางอากาศได้ 2 ครั้ง (รวมพื้นเป็น Triple Jump)
+            jumpsLeft: 2,
             isDashing: false,
             dashTimer: 0,
             dashCooldown: 0,
@@ -897,7 +897,7 @@ class PlatformerGame {
         p.y = this.spawnPoint.y;
         p.vx = 0;
         p.vy = -5.5;
-        p.invincibleTimer = 100; // ขยายระยะเวลาอมตะหลังเกิดใหม่
+        p.invincibleTimer = 100;
         p.hasShield = true;
         this.triggerShake(10, 15);
         this.sfx.playHit();
@@ -987,7 +987,7 @@ class PlatformerGame {
             p.isGrounded = false;
             p.coyoteTimer = 0;
             p.jumpBufferTimer = 0;
-            p.jumpsLeft = 2; // อนุญาตให้กระโดดกลางอากาศต่อได้อีก 2 จังหวะ
+            p.jumpsLeft = 2;
             this.sfx.playJump();
             this.addParticles(p.x + p.width / 2, p.y + p.height, '#facc15', 8);
             return true;
@@ -1031,7 +1031,7 @@ class PlatformerGame {
         if (!p || p.magicCooldown > 0) return;
 
         const isFever = p.isFever;
-        const cost = isFever ? 0 : 10; // ลดการใช้ MP ลงเหลือ 10
+        const cost = isFever ? 0 : 10;
 
         if (p.mp < cost) {
             this.addFloatingText(p.x, p.y - 20, '⚠️ MP ไม่พอ!', '#ef4444');
@@ -1137,7 +1137,7 @@ class PlatformerGame {
         if (p.hasShield) {
             p.hasShield = false;
             p.vy = -7;
-            p.invincibleTimer = 90; // เพิ่มเวลาอมตะตอนเกราะแตก
+            p.invincibleTimer = 90;
             this.sfx.playHit();
             this.triggerShake(8, 12);
             this.addParticles(p.x + p.width / 2, p.y + p.height / 2, '#38bdf8', 16);
@@ -1269,6 +1269,12 @@ class PlatformerGame {
                 ) {
                     cp.active = true;
                     this.spawnPoint = { x: cp.x, y: cp.y - p.height + 10 };
+                    
+                    // ตัวช่วยเกราะจุดเซฟ (Checkpoint Shield)
+                    if ((store.getState().upgrades?.shieldLevel || 0) > 0) {
+                        p.hasShield = true;
+                    }
+
                     this.sfx.playCheckpoint();
                     this.addParticles(cp.x, cp.y, '#22c55e', 20);
                     this.addFloatingText(cp.x - 20, cp.y - 15, 'จุดเซฟทำงาน!', '#22c55e');
@@ -1685,7 +1691,7 @@ class PlatformerGame {
 
             this.spells.forEach(sp => {
                 const dist = b.x - sp.x;
-                if (dist > 0 && dist < 140 && b.isGrounded && Math.random() < 0.35) { // ลดโอกาสบอสกระโดดหลบ
+                if (dist > 0 && dist < 140 && b.isGrounded && Math.random() < 0.35) {
                     b.vy = -8.2;
                     b.isGrounded = false;
                     this.addFloatingText(b.x, b.y - 15, '💨 EVADE JUMP!', '#facc15');
@@ -1703,7 +1709,7 @@ class PlatformerGame {
                 this.projectiles.push({
                     x: b.x,
                     y: b.y + b.height * 0.45,
-                    vx: -(p.speed + 2.0), // ปรับกระสุนบอสช้าลง
+                    vx: -(p.speed + 2.0),
                     vy: (Math.random() - 0.5) * 1.5,
                     radius: 7,
                     color: '#dc2626',
@@ -1744,7 +1750,7 @@ class PlatformerGame {
                     this.projectiles.push({
                         x: enemy.x,
                         y: enemy.y + enemy.height / 2,
-                        vx: -2.0, // ปรับความเร็วกระสุนศัตรูลงเหลือ 2.0
+                        vx: -2.0,
                         vy: 0,
                         radius: 5,
                         color: '#ef4444',
@@ -2883,7 +2889,7 @@ class PlatformerGame {
 
         this.ctx.restore();
 
-        // เอฟเฟกต์ Bullet Time (ม่านแสงโฟกัสสีฟ้าอ่อน) - ขยายเป็น 150 เฟรม
+        // เอฟเฟกต์ Bullet Time (ม่านแสงโฟกัสสีฟ้าอ่อน)
         if (this.isBulletTime) {
             this.ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -3028,7 +3034,6 @@ class PlatformerGame {
         const canBulletTime = p && !p.isGrounded && isStopPressed && (p.bulletTimeTimer < 150);
         this.isBulletTime = canBulletTime;
 
-        // สเกลเวลา Bullet Time: รันการอัปเดตฟิสิกส์ 1 ใน 3 เฟรม เพื่อสร้างสโลว์โมชั่นที่นุ่มนวล
         if (this.isBulletTime) {
             p.bulletTimeTimer++;
             this.bulletTimeFrame = (this.bulletTimeFrame || 0) + 1;

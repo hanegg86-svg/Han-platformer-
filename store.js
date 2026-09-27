@@ -1,5 +1,15 @@
 class Store {
     constructor() {
+        const defaultUpgrades = {
+            dashLevel: 0,
+            magnetLevel: 0,
+            heartLevel: 0,
+            mpLevel: 0,
+            shieldLevel: 0,
+            feverLevel: 0
+        };
+        const savedUpgrades = JSON.parse(localStorage.getItem('platformer_upgrades') || '{}');
+
         this.state = {
             activeTab: 'game',
             score: 0,
@@ -10,7 +20,7 @@ class Store {
             level: 1,
             selectedSkin: localStorage.getItem('platformer_skin') || 'fire',
             ownedSkins: JSON.parse(localStorage.getItem('platformer_owned_skins') || '["fire"]'),
-            upgrades: JSON.parse(localStorage.getItem('platformer_upgrades') || '{"dashLevel": 0, "magnetLevel": 0}'),
+            upgrades: { ...defaultUpgrades, ...savedUpgrades },
             coinsCount: parseInt(localStorage.getItem('platformer_coins') || '0', 10),
             fireballLevel: parseInt(localStorage.getItem('platformer_fireball_level') || '1', 10)
         };
@@ -141,7 +151,14 @@ class Store {
             level: 1,
             selectedSkin: 'fire',
             ownedSkins: ['fire'],
-            upgrades: { dashLevel: 0, magnetLevel: 0 },
+            upgrades: {
+                dashLevel: 0,
+                magnetLevel: 0,
+                heartLevel: 0,
+                mpLevel: 0,
+                shieldLevel: 0,
+                feverLevel: 0
+            },
             coinsCount: 0,
             fireballLevel: 1
         };

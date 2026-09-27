@@ -26,7 +26,11 @@ export class UIManager {
 
         this.upgradesConfig = [
             { id: 'dashLevel', name: '⚡ พุ่งไวขึ้น', desc: 'ลดเวลาคูลดาวน์ของการพุ่ง', basePrice: 50, maxLevel: 5 },
-            { id: 'magnetLevel', name: '🧲 แม่เหล็กทรงพลัง', desc: 'เพิ่มระยะการดูดเหรียญ', basePrice: 50, maxLevel: 5 }
+            { id: 'magnetLevel', name: '🧲 แม่เหล็กทรงพลัง', desc: 'เพิ่มระยะการดูดเหรียญ', basePrice: 50, maxLevel: 5 },
+            { id: 'heartLevel', name: '❤️ เพิ่มหัวใจสูงสุด', desc: 'เพิ่มชีวิตเริ่มต้น 1 ชีวิตต่อระดับ', basePrice: 60, maxLevel: 5 },
+            { id: 'mpLevel', name: '🧪 ฟื้นฟูมานาเวท', desc: 'เพิ่ม MP สูงสุดและอัตราฟื้นฟู MP ไวขึ้น', basePrice: 50, maxLevel: 5 },
+            { id: 'shieldLevel', name: '🛡️ เกราะจุดเซฟ', desc: 'ฟื้นฟูเกราะป้องกันทันทีเมื่อแตะจุดเซฟ', basePrice: 80, maxLevel: 3 },
+            { id: 'feverLevel', name: '🔥 ชาร์จฟีเวอร์ไวขึ้น', desc: 'สะสมเกจ Fever ไวขึ้น 25% ต่อระดับ', basePrice: 70, maxLevel: 5 }
         ];
     }
 
@@ -162,7 +166,7 @@ export class UIManager {
             btn.addEventListener('click', (e) => {
                 const upgId = e.target.getAttribute('data-upg');
                 const price = parseInt(e.target.getAttribute('data-price'), 10);
-                store.buyUpgrade(upgId, price);
+                store.buyUpgrade(upgId, price, upg.maxLevel);
             });
         });
     }
